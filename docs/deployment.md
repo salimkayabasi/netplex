@@ -93,8 +93,6 @@ When containerized, NetPlex expects two main volume mounts:
 1. Create a `docker-compose.yml` file in your application directory:
 
 ```yaml
-version: '3.8'
-
 services:
   netplex:
     build: .
