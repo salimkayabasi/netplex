@@ -31,7 +31,8 @@ def prune_orphans(db_path: str) -> dict:
     if not latest_week:
         logger.info("No rankings found. Skipping orphan pruning.")
         return {"orphans_found": 0, "folders_deleted": 0, "records_pruned": 0}
-    return run_cleanup_cycle(db_path, latest_week)
+    media_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
+    return run_cleanup_cycle(db_path, latest_week, media_dir=media_dir)
 
 def sync_plex_collections(db_path: str) -> bool:
     """Wraps Plex collection synchronization in safe connection exception handling."""

@@ -106,13 +106,15 @@ def prune_orphaned_records(db_path: str, orphan_ids: list[int]) -> int:
     finally:
         conn.close()
 
-def run_cleanup_cycle(db_path: str, latest_week: str, media_dir: str = "/data") -> dict:
+def run_cleanup_cycle(db_path: str, latest_week: str, media_dir: str = None) -> dict:
     """
     Executes a full cleanup cycle:
     1. Finds orphaned media items for latest_week.
     2. Deletes their media folders if safe.
     3. Prunes database records for items whose folders were successfully deleted (or missing).
     """
+    if media_dir is None:
+        media_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
     orphans = find_orphaned_media(db_path, latest_week)
     deleted_folders = 0
     pruned_ids = []

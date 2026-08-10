@@ -15,5 +15,6 @@ __pycache__/
 .pytest_cache/
 .cache/
 
-# Local Scratch
+# Local Scratch & Runtime Data
 scratch/
+.docker/

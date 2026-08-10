@@ -1,0 +1,45 @@
+# Git
+.git/
+.gitignore
+
+# Docker
+.docker/
+.dockerignore
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & Coverage
+.pytest_cache/
+.cache/
+.coverage
+htmlcov/
+tests/
+
+# Local persistence & media folders
+*.db
+*.sqlite3
+config/
+media/
+data/
+
+# Documentation & Scratch files
+docs/
+scratch/
+README.md
+
+# OS / Editor metadata
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -20,29 +20,49 @@ It runs as a background Docker container, downloading the latest Netflix Top 10 
 
 ---
 
-## 🐳 Quick Start (Docker Compose)
+## 🚀 Quick Start
 
-NetPlex is deployed exclusively using Docker. Create a `docker-compose.yml` file:
+NetPlex can be run directly using **Python** or containerized with **Docker Compose**.
 
-```yaml
-services:
-  netplex:
-    image: netplex:latest
-    container_name: netplex
-    ports:
-      - "8000:8000" # Web Settings UI
-    volumes:
-      - ./config:/config  # Stores SQLite database (netplex.db)
-      - ./media:/data     # Plex-compatible media files (movies/ & tv/)
-    restart: unless-stopped
-```
+### Option 1: Running via Docker Compose (Recommended)
 
-1. Start the container:
+1. Ensure `docker-compose.yml` is present in your project directory:
+   ```yaml
+   services:
+     netplex:
+       build: .
+       container_name: netplex
+       ports:
+         - "8000:8000" # Web Settings UI & Dashboard
+       volumes:
+         - ./.docker/config:/config  # Stores SQLite database (netplex.db)
+         - ./.docker/data:/data     # Plex-compatible media files (movies/ & tv/)
+       restart: unless-stopped
+   ```
+2. Start the container:
    ```bash
    docker compose up -d
    ```
-2. Open your web browser and navigate to `http://localhost:8000`.
-3. Complete the Plex Link authentication and select the countries/formats you wish to track.
+3. Open your browser and navigate to `http://localhost:8000`.
+
+### Option 2: Running Locally via Python
+
+1. Install system prerequisites (`ffmpeg` and `curl`):
+   ```bash
+   brew install ffmpeg curl  # macOS
+   ```
+2. Create and activate a virtual environment, then install dependencies:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Set environment variables and run NetPlex:
+   ```bash
+   mkdir -p config media
+   NETPLEX_DB_PATH=./config/netplex.db NETPLEX_CONFIG_DIR=./config NETPLEX_DATA_DIR=./media python main.py
+   ```
+4. Access the Web UI at `http://localhost:8000`.
 
 ---
 

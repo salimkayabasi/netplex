@@ -200,8 +200,10 @@ def extract_season_number(season_name: str | None) -> str:
         return f"{num:02d}"
     return "01"
 
-def download_pending_trailers(db_path: str, media_dir: str = "/data"):
+def download_pending_trailers(db_path: str, media_dir: str = None):
     """Fetches all pending media items from the database and downloads their trailers/subtitles."""
+    if media_dir is None:
+        media_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
     conn = _get_connection(db_path)
     try:
         cursor = conn.execute("SELECT id, title, type, release_year, season_name, folder_name FROM media_items WHERE status = 'pending'")
