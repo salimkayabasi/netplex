@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="3" allowSync="1" identifier="com.plexapp.plugins.library" librarySectionID="1" librarySectionTitle="Movies" librarySectionUUID="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+  <Video ratingKey="101" key="/library/metadata/101" title="Inside Out 2" originalTitle="Inside Out 2" year="2024" type="movie" summary="Joy, Sadness, Anger, Fear and Disgust take on new emotions.">
+    <Media id="201" duration="5760000" bitrate="4500" width="1920" height="1080" aspectRatio="1.78" audioChannels="6" audioCodec="eac3" videoCodec="h264">
+      <Part id="301" key="/library/parts/301/1710000000/file.mkv" duration="5760000" file="/data/movies/Inside Out 2 (2024)/Inside Out 2 (2024).mkv" size="3240000000"/>
+    </Media>
+  </Video>
+  <Video ratingKey="102" key="/library/metadata/102" title="Stranger Things" year="2016" type="show" summary="When a young boy vanishes, a small town uncovers a mystery.">
+    <Media id="202" duration="3000000" bitrate="3500" width="1920" height="1080" aspectRatio="1.78" audioChannels="6" audioCodec="aac" videoCodec="h264">
+      <Part id="302" key="/library/parts/302/1710000000/file.mkv" duration="3000000" file="/data/tv/Stranger Things (2016)/S01E01.mkv" size="1500000000"/>
+    </Media>
+  </Video>
+  <Video ratingKey="103" key="/library/metadata/103" title="Beverly Hills Cop: Axel F" year="2024" type="movie" summary="Axel Foley returns to Beverly Hills.">
+    <Media id="203" duration="6900000" bitrate="5000" width="1920" height="1080" aspectRatio="1.78" audioChannels="6" audioCodec="eac3" videoCodec="h264">
+      <Part id="303" key="/library/parts/303/1710000000/file.mkv" duration="6900000" file="/data/movies/Beverly Hills Cop Axel F (2024)/file.mkv" size="4000000000"/>
+    </Media>
+  </Video>
+</MediaContainer>
