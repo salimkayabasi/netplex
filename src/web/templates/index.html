@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}NetPlex Top 10 - {{ selected_country }}{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h1 class="section-title">
+                Netflix Top 10 in {{ selected_country }}
+            </h1>
+            <p class="section-subtitle">
+                Week: {{ current_week if current_week else 'Latest' }}
+            </p>
+        </div>
+
+        <div class="filter-tabs">
+            <a href="/?country={{ selected_country }}&category=Films" 
+               class="tab-btn {% if selected_category == 'Films' %}active{% endif %}">
+                Films
+            </a>
+            <a href="/?country={{ selected_country }}&category=TV" 
+               class="tab-btn {% if selected_category == 'TV' %}active{% endif %}">
+                TV Shows
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if rankings %}
+<div class="ranking-grid">
+    {% for item in rankings %}
+    <div class="media-card" onclick="openTrailerModal({{ item.media_item_id }}, '{{ item.title | escape }}')">
+        <div class="rank-badge">{{ item.rank }}</div>
+        <div class="card-poster">
+            <div class="card-poster-placeholder">
+                🎬
+            </div>
+            <div class="play-overlay">
+                <div class="play-btn-circle">
+                    ▶
+                </div>
+            </div>
+        </div>
+        <div class="card-info">
+            <div class="card-title">{{ item.title }}</div>
+            <div class="card-meta">
+                <span class="badge-type">{{ item.type }}</span>
+                <span>{{ item.release_year }}</span>
+                {% if item.season_name %}
+                <span>• {{ item.season_name }}</span>
+                {% endif %}
+                <span class="badge-status status-{{ item.status }}">
+                    {{ item.status }}
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No Top 10 Data Available</h3>
+    <p>There are currently no rankings recorded for {{ selected_country }} ({{ selected_category }}).</p>
+</div>
+{% endif %}
+{% endblock %}

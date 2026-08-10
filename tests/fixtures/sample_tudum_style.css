@@ -1,0 +1,12 @@
+:root {
+    --tudum-bg-color: #141414;
+    --tudum-text-color: #ffffff;
+    --tudum-brand-red: #E50914;
+    --tudum-card-radius: 8px;
+}
+
+body {
+    background-color: var(--tudum-bg-color);
+    color: var(--tudum-text-color);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}

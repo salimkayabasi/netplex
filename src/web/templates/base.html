@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NetPlex - Netflix Top 10{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/tudum_base.css">
+    <!-- Cached Tudum branding override if available -->
+    <link rel="stylesheet" href="/config/www/tudum.css" onerror="this.remove()">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/" class="brand">
+            <span class="brand-logo">NETPLEX</span>
+            <span class="brand-tag">TOP 10</span>
+        </a>
+        <div class="filter-bar">
+            <a href="/settings" class="tab-btn" style="text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
+                ⚙️ Settings
+            </a>
+            {% if monitored_countries %}
+            <select id="country-select" class="filter-select" aria-label="Select Country">
+                {% for c in monitored_countries %}
+                <option value="{{ c.country_code }}" {% if c.country_code == selected_country %}selected{% endif %}>
+                    {{ c.country_code }}
+                </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Video Trailer Modal Overlay -->
+    <div id="trailer-modal" class="modal-backdrop">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="modal-media-title" class="modal-title">Trailer Player</h3>
+                <button id="modal-close-btn" class="modal-close-btn" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <video id="modal-video-player" class="modal-video-player" controls preload="metadata"></video>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
