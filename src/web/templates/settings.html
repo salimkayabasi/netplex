@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}NetPlex Settings & Control Panel{% endblock %}
+
+{% block content %}
+<div class="section-header" style="margin-bottom: 1.5rem;">
+    <h1 class="section-title">
+        ⚙️ Settings & Control Panel
+    </h1>
+    <p class="section-subtitle">
+        Manage monitored regions, Plex server integration, subtitle downloads, and background operations.
+    </p>
+</div>
+
+{% if success %}
+<div id="success-alert" style="background-color: rgba(46, 204, 113, 0.2); border: 1px solid #2ecc71; color: #2ecc71; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between;">
+    <span>✓ Settings successfully saved and updated in database!</span>
+    <button type="button" onclick="document.getElementById('success-alert').remove()" style="background: none; border: none; color: #2ecc71; cursor: pointer; font-size: 1.2rem;">&times;</button>
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-bottom: 2.5rem;">
+
+    <!-- Card 1: Plex Integration -->
+    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                🎬 Plex Server Integration
+            </h2>
+            
+            <form id="plex-form" action="/settings" method="POST">
+                <div style="margin-bottom: 1.25rem;">
+                    <label for="plex_url" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                        Plex Server URL
+                    </label>
+                    <input type="url" id="plex_url" name="plex_url" value="{{ plex_url }}" placeholder="http://localhost:32400" required
+                           style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                </div>
+
+                <div style="margin-bottom: 1.25rem;">
+                    <label for="plex_token" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                        Plex Auth Token
+                    </label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="plex_token" name="plex_token" value="{{ plex_token }}" placeholder="Plex Access Token"
+                               style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                        <button type="button" id="btn-plex-pin" onclick="startPlexPinAuth()"
+                                style="background-color: var(--netflix-red); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s;">
+                            Plex Login (PIN)
+                        </button>
+                    </div>
+                    <p id="plex-auth-status" style="font-size: 0.8rem; margin-top: 0.4rem; color: var(--text-secondary);">
+                        {% if plex_token %}✓ Token configured{% else %}⚠️ Token not connected{% endif %}
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card 2: Sync & Subtitle Preferences -->
+    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+            ⏱️ Sync & Subtitle Preferences
+        </h2>
+        
+        <form id="preferences-form" action="/settings" method="POST">
+            <div style="margin-bottom: 1rem;">
+                <label for="update_interval_hours" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    Update Interval (Hours)
+                </label>
+                <input type="number" id="update_interval_hours" name="update_interval_hours" value="{{ update_interval }}" min="1" max="720" required
+                       style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label for="subtitle_languages" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    Preferred Subtitle Languages (Comma-separated)
+                </label>
+                <input type="text" id="subtitle_languages" name="subtitle_languages" value="{{ subtitle_languages }}" placeholder="en, es, de"
+                       style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+            </div>
+
+            <div style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+                <input type="checkbox" id="trailer_subtitles" name="trailer_subtitles" value="true" {% if trailer_subtitles %}checked{% endif %}
+                       style="width: 18px; height: 18px; accent-color: var(--netflix-red); cursor: pointer;">
+                <label for="trailer_subtitles" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+                    Download Subtitles for Trailers (.srt)
+                </label>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label for="log_level" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    System Log Level
+                </label>
+                <select id="log_level" name="log_level"
+                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                    <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                    <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                    <option value="WARNING" {% if log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                    <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Card 3: Manual Control Panel -->
+    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                🚀 Manual Control Panel
+            </h2>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
+                Trigger an instant execution of the scraper, trailer downloader, Plex collection sync, and cleanup pipeline in the background.
+            </p>
+        </div>
+        
+        <div>
+            <div id="crawl-status-badge" style="margin-bottom: 1rem; font-size: 0.85rem; padding: 0.5rem 0.8rem; border-radius: 4px; background-color: rgba(255,255,255,0.05); color: var(--text-secondary);">
+                Status: Idle
+            </div>
+            <button type="button" id="btn-trigger-crawl" onclick="triggerManualCrawl()"
+                    style="width: 100%; background-color: #27ae60; color: #fff; border: none; padding: 0.8rem 1.2rem; border-radius: 4px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: background 0.2s;">
+                ▶ Trigger Manual Crawl Job
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- Full-width Section: Monitored Countries Form -->
+<div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.75rem; margin-bottom: 2.5rem;">
+    <form id="main-settings-form" action="/settings" method="POST">
+        <!-- Hidden mirror inputs for other cards -->
+        <input type="hidden" name="plex_url" id="hidden_plex_url">
+        <input type="hidden" name="plex_token" id="hidden_plex_token">
+        <input type="hidden" name="update_interval_hours" id="hidden_update_interval_hours">
+        <input type="hidden" name="subtitle_languages" id="hidden_subtitle_languages">
+        <input type="hidden" name="trailer_subtitles" id="hidden_trailer_subtitles">
+        <input type="hidden" name="log_level" id="hidden_log_level">
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <div>
+                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
+                    🌍 Monitored Regions & Content Formats
+                </h2>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                    Select which Netflix Top 10 countries to monitor and choose content formats (Movies / TV Shows).
+                </p>
+            </div>
+            
+            <button type="submit" onclick="syncHiddenFields()"
+                    style="background-color: var(--netflix-red); color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 1rem;">
+                💾 Save All Settings
+            </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            {% for c in available_countries %}
+            {% set is_checked = c.code in monitored_dict %}
+            {% set fmt = monitored_dict.get(c.code, 'movie,tv') %}
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.8rem 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; color: var(--text-primary);">
+                        <input type="checkbox" name="country_code" value="{{ c.code }}" {% if is_checked %}checked{% endif %}
+                               style="width: 16px; height: 16px; accent-color: var(--netflix-red);">
+                        <span>{{ c.name }} ({{ c.code }})</span>
+                    </label>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; padding-left: 1.5rem; font-size: 0.82rem; color: var(--text-secondary);">
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                        <input type="checkbox" name="format_movie_{{ c.code }}" value="movie" {% if 'movie' in fmt or not is_checked %}checked{% endif %}
+                               style="accent-color: var(--netflix-red);">
+                        Movies
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                        <input type="checkbox" name="format_tv_{{ c.code }}" value="tv" {% if 'tv' in fmt or not is_checked %}checked{% endif %}
+                               style="accent-color: var(--netflix-red);">
+                        TV Shows
+                    </label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </form>
+</div>
+
+<!-- Full-width Section: Live Log Console Streamer -->
+<div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.75rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                📜 Application Log Console
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                Live tail of the last 100 log entries from application runtime.
+            </p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <label style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                <input type="checkbox" id="auto-refresh-logs" checked style="accent-color: var(--netflix-red);">
+                Auto-Refresh (5s)
+            </label>
+            <button type="button" onclick="fetchLogs()"
+                    style="background-color: rgba(255,255,255,0.1); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.2); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                🔄 Refresh Logs
+            </button>
+        </div>
+    </div>
+
+    <pre id="log-console"
+         style="background-color: #0d0d0d; color: #33ff57; border: 1px solid rgba(255,255,255,0.1); font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; padding: 1rem; border-radius: 6px; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">Loading application logs...</pre>
+</div>
+
+<script>
+function syncHiddenFields() {
+    document.getElementById('hidden_plex_url').value = document.getElementById('plex_url').value;
+    document.getElementById('hidden_plex_token').value = document.getElementById('plex_token').value;
+    document.getElementById('hidden_update_interval_hours').value = document.getElementById('update_interval_hours').value;
+    document.getElementById('hidden_subtitle_languages').value = document.getElementById('subtitle_languages').value;
+    document.getElementById('hidden_trailer_subtitles').value = document.getElementById('trailer_subtitles').checked ? 'true' : 'false';
+    document.getElementById('hidden_log_level').value = document.getElementById('log_level').value;
+}
+
+// Plex PIN Auth Flow
+let plexPollInterval = null;
+
+async function startPlexPinAuth() {
+    const btn = document.getElementById('btn-plex-pin');
+    const statusText = document.getElementById('plex-auth-status');
+    btn.disabled = true;
+    btn.textContent = "Connecting...";
+    statusText.textContent = "Requesting PIN from Plex.tv...";
+
+    try {
+        const resp = await fetch('/api/auth/plex/pin', { method: 'POST' });
+        if (!resp.ok) {
+            throw new Error('Failed to request Plex PIN');
+        }
+        const data = await resp.json();
+        
+        // Open Plex authorization URL in popup
+        const width = 600, height = 700;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        const popup = window.open(
+            data.auth_url,
+            'PlexAuthPopup',
+            `width=${width},height=${height},top=${top},left=${left}`
+        );
+
+        statusText.textContent = `PIN: ${data.code} — Waiting for authorization...`;
+
+        if (plexPollInterval) clearInterval(plexPollInterval);
+        
+        plexPollInterval = setInterval(async () => {
+            try {
+                const statusResp = await fetch(`/api/auth/plex/status/${data.id}`);
+                const statusData = await statusResp.json();
+                
+                if (statusData.authorized && statusData.token) {
+                    clearInterval(plexPollInterval);
+                    document.getElementById('plex_token').value = statusData.token;
+                    statusText.textContent = "✓ Plex Authorized successfully! Token updated.";
+                    statusText.style.color = "#2ecc71";
+                    btn.disabled = false;
+                    btn.textContent = "Plex Login (PIN)";
+                    if (popup && !popup.closed) {
+                        popup.close();
+                    }
+                }
+            } catch (err) {
+                console.error("Polling error:", err);
+            }
+        }, 2000);
+
+    } catch (err) {
+        statusText.textContent = `❌ Auth Error: ${err.message}`;
+        statusText.style.color = "#e74c3c";
+        btn.disabled = false;
+        btn.textContent = "Plex Login (PIN)";
+    }
+}
+
+// Manual Crawl Trigger Flow
+async function triggerManualCrawl() {
+    const btn = document.getElementById('btn-trigger-crawl');
+    const badge = document.getElementById('crawl-status-badge');
+    
+    btn.disabled = true;
+    btn.textContent = "⏳ Starting Crawl Job...";
+    badge.textContent = "Status: Initiating pipeline...";
+    badge.style.color = "#f1c40f";
+
+    try {
+        const resp = await fetch('/api/crawl', { method: 'POST' });
+        if (resp.status === 202) {
+            badge.textContent = "Status: Crawl job in progress in background...";
+            badge.style.color = "#2ecc71";
+            btn.textContent = "▶ Crawl Job Running...";
+            pollCrawlStatus();
+        } else if (resp.status === 409) {
+            badge.textContent = "Status: A crawl job is already running!";
+            badge.style.color = "#e67e22";
+            btn.disabled = false;
+            btn.textContent = "▶ Trigger Manual Crawl Job";
+        } else {
+            throw new Error(`Unexpected status code ${resp.status}`);
+        }
+    } catch (err) {
+        badge.textContent = `Status: Error starting crawl - ${err.message}`;
+        badge.style.color = "#e74c3c";
+        btn.disabled = false;
+        btn.textContent = "▶ Trigger Manual Crawl Job";
+    }
+}
+
+async function pollCrawlStatus() {
+    const interval = setInterval(async () => {
+        try {
+            const resp = await fetch('/api/crawl/status');
+            const data = await resp.json();
+            const badge = document.getElementById('crawl-status-badge');
+            const btn = document.getElementById('btn-trigger-crawl');
+
+            if (!data.is_crawling) {
+                clearInterval(interval);
+                badge.textContent = "Status: Crawl job completed (Idle)";
+                badge.style.color = "var(--text-secondary)";
+                btn.disabled = false;
+                btn.textContent = "▶ Trigger Manual Crawl Job";
+                fetchLogs();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, 3000);
+}
+
+// Live Log Viewer Streamer
+async function fetchLogs() {
+    const consoleElem = document.getElementById('log-console');
+    try {
+        const resp = await fetch('/api/logs');
+        if (!resp.ok) {
+            consoleElem.textContent = "Unable to load log contents.";
+            return;
+        }
+        const data = await resp.json();
+        if (data.lines && data.lines.length > 0) {
+            consoleElem.textContent = data.lines.join('\n');
+        } else {
+            consoleElem.textContent = "No log output recorded yet.";
+        }
+        consoleElem.scrollTop = consoleElem.scrollHeight;
+    } catch (err) {
+        consoleElem.textContent = `Log fetch error: ${err.message}`;
+    }
+}
+
+// Initial fetch and auto-refresh timer for logs
+document.addEventListener('DOMContentLoaded', () => {
+    fetchLogs();
+    setInterval(() => {
+        const autoRefreshChecked = document.getElementById('auto-refresh-logs')?.checked;
+        if (autoRefreshChecked) {
+            fetchLogs();
+        }
+    }, 5000);
+});
+</script>
+{% endblock %}
