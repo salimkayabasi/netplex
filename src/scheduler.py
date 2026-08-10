@@ -46,6 +46,8 @@ def sync_plex_collections(db_path: str) -> bool:
         logger.error(f"Plex collection sync failed: {e}")
         return False
 
+from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock
+
 def run_full_sync_pipeline(db_path: str) -> dict:
     """
     Executes full synchronization pipeline in order:
@@ -55,30 +57,37 @@ def run_full_sync_pipeline(db_path: str) -> dict:
     4. Sync Plex server collections
     5. Record last_crawl_timestamp
     """
-    logger.info("Starting full NetPlex sync pipeline...")
-    results = {}
-    
-    logger.info("Step 1: Crawling Netflix Top 10 rankings...")
-    crawl_netflix_top10(db_path)
-    results["step1"] = "completed"
-    
-    logger.info("Step 2: Downloading pending trailers...")
-    download_pending_trailers(db_path)
-    results["step2"] = "completed"
-    
-    logger.info("Step 3: Pruning orphaned media...")
-    cleanup_res = prune_orphans(db_path)
-    results["step3"] = cleanup_res
-    
-    logger.info("Step 4: Syncing Plex collections...")
-    plex_res = sync_plex_collections(db_path)
-    results["step4"] = plex_res
-    
-    now_iso = datetime.now(timezone.utc).isoformat()
-    set_setting(db_path, "last_crawl_timestamp", now_iso)
-    logger.info(f"Full sync pipeline completed successfully at {now_iso}.")
-    
-    return results
+    if not try_acquire_crawl_lock():
+        logger.info("Crawl job skipped: another crawl job is already in progress.")
+        return {"status": "skipped", "reason": "lock_active"}
+
+    try:
+        logger.info("Starting full NetPlex sync pipeline...")
+        results = {}
+        
+        logger.info("Step 1: Crawling Netflix Top 10 rankings...")
+        crawl_netflix_top10(db_path)
+        results["step1"] = "completed"
+        
+        logger.info("Step 2: Downloading pending trailers...")
+        download_pending_trailers(db_path)
+        results["step2"] = "completed"
+        
+        logger.info("Step 3: Pruning orphaned media...")
+        cleanup_res = prune_orphans(db_path)
+        results["step3"] = cleanup_res
+        
+        logger.info("Step 4: Syncing Plex collections...")
+        plex_res = sync_plex_collections(db_path)
+        results["step4"] = plex_res
+        
+        now_iso = datetime.now(timezone.utc).isoformat()
+        set_setting(db_path, "last_crawl_timestamp", now_iso)
+        logger.info(f"Full sync pipeline completed successfully at {now_iso}.")
+        
+        return results
+    finally:
+        release_crawl_lock()
 
 def should_run_sync(db_path: str) -> bool:
     """Determines whether a sync pipeline execution is due based on DB timestamp and interval."""

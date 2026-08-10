@@ -62,4 +62,45 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = currentUrl.toString();
         });
     }
+
+    // Trigger Manual Crawl from landing page handler
+    window.triggerManualCrawlFromLanding = async () => {
+        const btn = document.getElementById('btn-landing-crawl');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.textContent = "⏳ Crawling...";
+        try {
+            const resp = await fetch('/api/crawl', { method: 'POST' });
+            if (resp.status === 202) {
+                btn.textContent = "▶ Crawling in progress...";
+                const interval = setInterval(async () => {
+                    try {
+                        const statusResp = await fetch('/api/crawl/status');
+                        const data = await statusResp.json();
+                        if (!data.is_crawling) {
+                            clearInterval(interval);
+                            btn.textContent = "✓ Crawl Done!";
+                            setTimeout(() => window.location.reload(), 1000);
+                        }
+                    } catch (err) {
+                        console.error("Crawl status check error:", err);
+                    }
+                }, 3000);
+            } else if (resp.status === 409) {
+                btn.textContent = "⚠️ Crawl Active";
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = "▶ Trigger Crawl";
+                }, 3000);
+            } else {
+                throw new Error(`Status ${resp.status}`);
+            }
+        } catch (err) {
+            btn.textContent = "❌ Crawl Failed";
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = "▶ Trigger Crawl";
+            }, 3000);
+        }
+    };
 });

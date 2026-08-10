@@ -55,7 +55,7 @@ def init_db(db_path: str = "/config/netplex.db"):
                 CREATE TABLE IF NOT EXISTS rankings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     country_code TEXT NOT NULL,
-                    category TEXT NOT NULL CHECK (category IN ('Films', 'TV')),
+                    category TEXT NOT NULL CHECK (category IN ('Movies', 'TV')),
                     rank INTEGER NOT NULL CHECK (rank >= 1 AND rank <= 10),
                     week TEXT NOT NULL,
                     media_item_id INTEGER NOT NULL,
@@ -84,6 +84,22 @@ def init_db(db_path: str = "/config/netplex.db"):
                     "INSERT INTO settings (key, value) VALUES ('plex_client_id', ?)",
                     (client_id,)
                 )
+
+            # Truncate media items and rankings if no monitored countries exist (first boot / no config set)
+            cursor = conn.execute("SELECT COUNT(*) as count FROM monitored_countries")
+            if cursor.fetchone()['count'] == 0:
+                conn.execute("DELETE FROM rankings")
+                conn.execute("DELETE FROM media_items")
+    finally:
+        conn.close()
+
+def truncate_database(db_path: str):
+    """Truncates rankings and media_items tables from database."""
+    conn = _get_connection(db_path)
+    try:
+        with conn:
+            conn.execute("DELETE FROM rankings")
+            conn.execute("DELETE FROM media_items")
     finally:
         conn.close()
 

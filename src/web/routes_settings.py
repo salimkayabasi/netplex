@@ -23,6 +23,12 @@ from src.scraper.netflix_top10 import crawl_netflix_top10
 from src.scraper.tudum_downloader import download_pending_trailers
 from src.cleanup import run_cleanup_cycle
 
+from src.crawler_lock import (
+    try_acquire_crawl_lock,
+    release_crawl_lock,
+    is_crawl_in_progress
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -35,9 +41,6 @@ DEFAULT_DB_PATH = os.environ.get("NETPLEX_DB_PATH", "/config/netplex.db")
 
 def get_db_path(request: Request) -> str:
     return getattr(request.app.state, "db_path", getattr(request.state, "db_path", DEFAULT_DB_PATH))
-
-IS_CRAWLING = False
-crawling_lock = threading.Lock()
 
 async def parse_form_data(request: Request) -> dict[str, list[str]]:
     try:
@@ -189,48 +192,14 @@ def check_plex_pin_status(request: Request, pin_id: str):
         return JSONResponse({"authorized": True, "token": auth_token})
     return JSONResponse({"authorized": False})
 
-@router.get("/api/logs")
-def get_application_logs(request: Request, max_lines: int = Query(100, ge=1, le=1000)):
-    log_path = getattr(request.app.state, "log_path", os.environ.get("NETPLEX_LOG_FILE", "/config/netplex.log"))
-    abs_log_path = os.path.abspath(log_path)
-    
-    config_dir = getattr(request.app.state, "config_dir", os.environ.get("NETPLEX_CONFIG_DIR", os.path.dirname(abs_log_path) or "/config"))
-    allowed_dir = os.path.abspath(config_dir)
-    
-    try:
-        common = os.path.commonpath([abs_log_path, allowed_dir])
-        if common != allowed_dir and not abs_log_path.startswith(allowed_dir):
-            raise HTTPException(status_code=403, detail="Access outside allowed log directory is forbidden")
-    except Exception:
-        raise HTTPException(status_code=403, detail="Access outside allowed log directory is forbidden")
-
-    if not os.path.exists(abs_log_path):
-        return JSONResponse({"lines": [], "content": ""})
-
-    try:
-        with open(abs_log_path, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-            last_lines = [line.rstrip("\r\n") for line in lines[-max_lines:]]
-            return JSONResponse({
-                "lines": last_lines,
-                "content": "\n".join(last_lines)
-            })
-    except Exception as e:
-        logger.error(f"Error reading log file {abs_log_path}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read log file")
-
 @router.post("/api/crawl", status_code=202)
 def trigger_manual_crawl(request: Request, background_tasks: BackgroundTasks):
-    global IS_CRAWLING
-    with crawling_lock:
-        if IS_CRAWLING:
-            raise HTTPException(status_code=409, detail="A crawl job is already in progress")
-        IS_CRAWLING = True
+    if not try_acquire_crawl_lock():
+        raise HTTPException(status_code=409, detail="A crawl job is already in progress")
 
     db_path = get_db_path(request)
 
     def task_wrapper():
-        global IS_CRAWLING
         try:
             crawl_netflix_top10(db_path)
             download_pending_trailers(db_path)
@@ -253,14 +222,11 @@ def trigger_manual_crawl(request: Request, background_tasks: BackgroundTasks):
         except Exception as e:
             logger.error(f"Manual crawl pipeline error: {e}")
         finally:
-            with crawling_lock:
-                IS_CRAWLING = False
+            release_crawl_lock()
 
     background_tasks.add_task(task_wrapper)
     return JSONResponse(status_code=202, content={"status": "accepted", "message": "Crawl pipeline initiated"})
 
 @router.get("/api/crawl/status")
 def get_crawl_status():
-    global IS_CRAWLING
-    with crawling_lock:
-        return JSONResponse({"is_crawling": IS_CRAWLING})
+    return JSONResponse({"is_crawling": is_crawl_in_progress()})

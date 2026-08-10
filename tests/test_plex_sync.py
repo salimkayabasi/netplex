@@ -205,7 +205,7 @@ def test_run_plex_sync_success(tmp_path):
     set_monitored_country(db_file, "US", "movies")
     
     item_id = upsert_media_item(db_file, "Inside Out 2", "movie", 2024, None, "Inside Out 2 (2024)")
-    insert_ranking(db_file, "US", "Films", 1, "2026-W32", item_id)
+    insert_ranking(db_file, "US", "Movies", 1, "2026-W32", item_id)
 
     item1 = MockPlexItem("Inside Out 2", 2024)
     section = MockLibrarySection("Movies", "movie", [item1])
@@ -215,7 +215,7 @@ def test_run_plex_sync_success(tmp_path):
         result = run_plex_sync(db_file, "2026-W32")
         assert result is True
         assert len(section.collections()) == 1
-        assert section.collections()[0].title == "Netflix Top 10 - US Films"
+        assert section.collections()[0].title == "Netflix Top 10 - US Movies"
 
 
 def test_run_plex_sync_missing_settings(tmp_path):

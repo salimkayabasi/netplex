@@ -242,9 +242,9 @@ def run_plex_sync(db_path: str, week: str) -> bool:
             formats_setting = record.get("formats", "both")
             
             categories = []
-            if formats_setting in ("movies", "both"):
-                categories.append("Films")
-            if formats_setting in ("tv", "both"):
+            if any(f in formats_setting for f in ("movie", "movies", "both")):
+                categories.append("Movies")
+            if any(f in formats_setting for f in ("tv", "both")):
                 categories.append("TV")
                 
             for category in categories:

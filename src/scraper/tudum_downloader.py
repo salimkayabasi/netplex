@@ -14,6 +14,9 @@ from src.metadata.nfo_generator import (
     write_nfo_file
 )
 
+import urllib.parse
+import urllib.error
+
 logger = logging.getLogger(__name__)
 
 def make_slug(title: str) -> str:
@@ -24,7 +27,22 @@ def make_slug(title: str) -> str:
     slug = re.sub(r'-+', '-', slug)
     return slug.strip('-')
 
-def find_tudum_page(title: str, item_type: str, year: int) -> str:
+def sanitize_url(url: str) -> str:
+    """Ensures URL has scheme/domain and handles URL encoding for spaces and control characters."""
+    if not url:
+        return url
+    url = url.strip()
+    if url.startswith('/'):
+        url = f"https://www.netflix.com{url}"
+    elif not url.startswith('http://') and not url.startswith('https://'):
+        url = f"https://{url}"
+        
+    parts = urllib.parse.urlsplit(url)
+    encoded_path = urllib.parse.quote(parts.path, safe='/:?&=#%')
+    encoded_query = urllib.parse.quote(parts.query, safe='/:?&=#%')
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, encoded_path, encoded_query, parts.fragment))
+
+def find_tudum_page(title: str, item_type: str, year: int) -> str | None:
     """Generates the direct URL on Netflix Tudum or scans Top 10 list page as fallback."""
     slug = make_slug(title)
     direct_url = f"https://www.netflix.com/tudum/{slug}"
@@ -49,17 +67,17 @@ def find_tudum_page(title: str, item_type: str, year: int) -> str:
                 if slug in link.lower():
                     if link.startswith('http'):
                         return link
-                    # e.g. "/tudum/slug" -> "https://www.netflix.com/tudum/slug"
-                    # clean up double /tudum
                     cleaned_link = link.replace('/tudum', '')
                     return f"https://www.netflix.com/tudum{cleaned_link}"
     except Exception:
         pass
         
-    return direct_url
+    return None
 
-def extract_trailer_assets(tudum_url: str) -> dict:
+def extract_trailer_assets(tudum_url: str | None) -> dict:
     """Fetches the HTML of the Tudum page, extracts the unescaped graphql models, and locates media assets."""
+    if not tudum_url:
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
     content = ""
     try:
         req = urllib.request.Request(tudum_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -68,9 +86,15 @@ def extract_trailer_assets(tudum_url: str) -> dict:
                 content = response.read().decode('utf-8')
         except http.client.IncompleteRead as e:
             content = e.partial.decode('utf-8')
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            logger.info(f"Tudum page not found (404) for URL: {tudum_url}")
+        else:
+            logger.warning(f"HTTP Error {e.code} fetching {tudum_url}")
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
     except Exception as e:
-        logger.error(f"Error fetching page {tudum_url}: {e}")
-        return {"video_url": None, "subtitle_url": None}
+        logger.warning(f"Error fetching page {tudum_url}: {e}")
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
         
     # Unescape the graphql models block if present
     match = re.search(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\)", content)
@@ -82,13 +106,13 @@ def extract_trailer_assets(tudum_url: str) -> dict:
             pass
             
     # Find all double-quoted URLs containing .mp4 or .mkv
-    video_urls = re.findall(r'"(https?://[^"]+?\.(?:mp4|mkv)[^"]*)"', content)
+    video_urls = re.findall(r'"((?:https?://|/)[^"]+?\.(?:mp4|mkv)[^"]*)"', content)
     filtered_videos = [u for u in video_urls if "TudumSignIn_" not in u]
-    video_url = filtered_videos[0] if filtered_videos else None
+    video_url = sanitize_url(filtered_videos[0]) if filtered_videos else None
     
     # Find all double-quoted URLs containing .vtt or .srt
-    subtitle_urls = re.findall(r'"(https?://[^"]+?\.(?:vtt|srt)[^"]*)"', content)
-    subtitle_url = subtitle_urls[0] if subtitle_urls else None
+    subtitle_urls = re.findall(r'"((?:https?://|/)[^"]+?\.(?:vtt|srt)[^"]*)"', content)
+    subtitle_url = sanitize_url(subtitle_urls[0]) if subtitle_urls else None
     
     # Extract synopsis / plot
     plot = None
@@ -124,7 +148,8 @@ def extract_trailer_assets(tudum_url: str) -> dict:
 def download_file(url: str, output_path: str):
     """Stream-downloads the file from the given URL to output_path."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    clean_url = sanitize_url(url)
+    req = urllib.request.Request(clean_url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=15) as response, open(output_path, 'wb') as out_file:
         while True:
             chunk = response.read(16384)
@@ -191,13 +216,33 @@ def convert_vtt_to_srt(vtt_content: str) -> str:
     return "\n".join(srt_blocks)
 
 def extract_season_number(season_name: str | None) -> str:
-    """Extracts the season number from a string, zero-padding it to 2 digits (defaults to '01')."""
+    """Extracts the season number (zero-padded to 2 digits). Handles digits ('Season 2'), word numbers ('Season Two'), and Roman numerals ('Season II'). Defaults to '01'."""
     if not season_name:
         return "01"
+    
+    # 1. Search for digits first
     match = re.search(r'\d+', season_name)
     if match:
-        num = int(match.group(0))
-        return f"{num:02d}"
+        return f"{int(match.group(0)):02d}"
+        
+    # 2. Word numbers mapping
+    word_map = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+    }
+    for word, num in word_map.items():
+        if re.search(r'\b' + word + r'\b', season_name, re.IGNORECASE):
+            return f"{num:02d}"
+            
+    # 3. Roman numerals mapping
+    roman_map = [
+        (r'\bx\b', 10), (r'\bix\b', 9), (r'\bviii\b', 8), (r'\bvii\b', 7), (r'\bvi\b', 6),
+        (r'\bv\b', 5), (r'\biv\b', 4), (r'\biii\b', 3), (r'\bii\b', 2), (r'\bi\b', 1)
+    ]
+    for pattern, num in roman_map:
+        if re.search(pattern, season_name, re.IGNORECASE):
+            return f"{num:02d}"
+            
     return "01"
 
 def download_pending_trailers(db_path: str, media_dir: str = None):

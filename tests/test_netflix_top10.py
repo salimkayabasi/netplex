@@ -85,7 +85,7 @@ def test_parse_top10_data_country():
         assert item['country_code'] in ["US", "AR"]
         if item['country_code'] == "AR":
             assert item['type'] == "tv"
-        assert item['category'] in ["Films", "TV"]
+        assert item['category'] in ["Movies", "TV"]
         assert 1 <= item['rank'] <= 10
         assert item['title'] != ""
         assert item['folder_name'] == f"{item['title']} ({item['release_year']})"
@@ -114,7 +114,7 @@ def test_parse_top10_data_global():
     assert len(results) > 0
     for item in results:
         assert item['country_code'] == "GLOBAL"
-        assert item['category'] in ["Films", "TV"]
+        assert item['category'] in ["Movies", "TV"]
         assert 1 <= item['rank'] <= 10
         assert item['title'] != ""
 
@@ -138,7 +138,7 @@ def test_crawl_netflix_top10(mock_fetch, initialized_db):
     crawl_netflix_top10(initialized_db)
 
     # Verify rankings populated for the latest week "2026-08-02"
-    global_rankings = get_active_rankings(initialized_db, "GLOBAL", "Films", "2026-08-02")
+    global_rankings = get_active_rankings(initialized_db, "GLOBAL", "Movies", "2026-08-02")
     assert len(global_rankings) > 0
     assert global_rankings[0]['rank'] == 1
     # Check that media item joins correctly
@@ -150,5 +150,5 @@ def test_crawl_netflix_top10(mock_fetch, initialized_db):
     assert len(ar_tv_rankings) > 0
 
     # Ensure rankings for AR Movies are empty since we only monitored 'tv'
-    ar_movie_rankings = get_active_rankings(initialized_db, "AR", "Films", "2026-08-02")
+    ar_movie_rankings = get_active_rankings(initialized_db, "AR", "Movies", "2026-08-02")
     assert len(ar_movie_rankings) == 0

@@ -42,11 +42,11 @@ def test_find_orphaned_media(temp_db):
     id3 = upsert_media_item(temp_db, "Show Three", "tv", 2023, "Season 1", "Show Three (2023)")
 
     # Insert rankings for week "2026-W32" (only id1 and id3 active)
-    insert_ranking(temp_db, "US", "Films", 1, "2026-W32", id1)
+    insert_ranking(temp_db, "US", "Movies", 1, "2026-W32", id1)
     insert_ranking(temp_db, "US", "TV", 1, "2026-W32", id3)
 
     # id2 is active in an older week "2026-W31"
-    insert_ranking(temp_db, "US", "Films", 2, "2026-W31", id2)
+    insert_ranking(temp_db, "US", "Movies", 2, "2026-W31", id2)
 
     # find_orphaned_media for week "2026-W32" should return id2
     orphans = find_orphaned_media(temp_db, "2026-W32")
@@ -125,7 +125,7 @@ def test_delete_media_folder_traversal_prevention(temp_data_dir, caplog):
 def test_prune_orphaned_records(temp_db):
     id1 = upsert_media_item(temp_db, "Movie One", "movie", 2021, None, "Movie One (2021)")
     id2 = upsert_media_item(temp_db, "Movie Two", "movie", 2022, None, "Movie Two (2022)")
-    insert_ranking(temp_db, "US", "Films", 1, "2026-W30", id1)
+    insert_ranking(temp_db, "US", "Movies", 1, "2026-W30", id1)
 
     pruned = prune_orphaned_records(temp_db, [id1, id2])
     assert pruned == 2
@@ -141,8 +141,8 @@ def test_run_cleanup_cycle(temp_db, temp_data_dir):
     active_id = upsert_media_item(temp_db, "Active Movie", "movie", 2024, None, "Active Movie (2024)")
     orphan_id = upsert_media_item(temp_db, "Orphan Movie", "movie", 2020, None, "Orphan Movie (2020)")
 
-    insert_ranking(temp_db, "US", "Films", 1, "2026-W32", active_id)
-    insert_ranking(temp_db, "US", "Films", 2, "2026-W31", orphan_id)
+    insert_ranking(temp_db, "US", "Movies", 1, "2026-W32", active_id)
+    insert_ranking(temp_db, "US", "Movies", 2, "2026-W31", orphan_id)
 
     orphan_folder = os.path.join(temp_data_dir, "movies", "Orphan Movie (2020)")
     os.makedirs(orphan_folder, exist_ok=True)

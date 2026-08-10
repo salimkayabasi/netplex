@@ -115,21 +115,10 @@ def test_plex_pin_status(client_and_db):
         assert resp.status_code == 200
         assert resp.json() == {"authorized": True, "token": "my_new_auth_token"}
 
-def test_access_logs(client_and_db):
-    client, db_path, log_path, tmp_dir = client_and_db
-    
-    # Valid logs request - returns last 100 lines
-    resp = client.get("/api/logs?max_lines=100")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "lines" in data
-    assert len(data["lines"]) == 100
-    assert "Test log line 150" in data["lines"][-1]
-    
-    # Directory traversal test: attempt to read file outside allowed config_dir
-    app.state.log_path = "/etc/passwd"
-    resp_forbidden = client.get("/api/logs")
-    assert resp_forbidden.status_code == 403
+def test_logs_endpoint_removed(client_and_db):
+    client, _, _, _ = client_and_db
+    resp = client.get("/api/logs")
+    assert resp.status_code == 404
 
 def test_crawl_endpoint(client_and_db):
     client, db_path, _, _ = client_and_db
@@ -146,3 +135,15 @@ def test_crawl_endpoint(client_and_db):
         
         status_resp = client.get("/api/crawl/status")
         assert status_resp.status_code == 200
+
+def test_crawl_endpoint_singleton_conflict(client_and_db):
+    client, db_path, _, _ = client_and_db
+    from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock
+
+    assert try_acquire_crawl_lock() is True
+    try:
+        resp = client.post("/api/crawl")
+        assert resp.status_code == 409
+        assert "already in progress" in resp.json()["detail"]
+    finally:
+        release_crawl_lock()

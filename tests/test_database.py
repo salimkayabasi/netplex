@@ -206,27 +206,27 @@ def test_rankings_api_and_constraints(initialized_db):
     item_id_2 = upsert_media_item(initialized_db, "Movie 2", "movie", 2024, None, "Movie 2 (2024)")
 
     # Insert rankings
-    insert_ranking(initialized_db, "US", "Films", 1, "2026-08-09", item_id_1)
-    insert_ranking(initialized_db, "US", "Films", 2, "2026-08-09", item_id_2)
+    insert_ranking(initialized_db, "US", "Movies", 1, "2026-08-09", item_id_1)
+    insert_ranking(initialized_db, "US", "Movies", 2, "2026-08-09", item_id_2)
 
     # Verify foreign key constraint (non-existent media_item_id)
     with pytest.raises(sqlite3.IntegrityError):
-        insert_ranking(initialized_db, "US", "Films", 3, "2026-08-09", 99999)
+        insert_ranking(initialized_db, "US", "Movies", 3, "2026-08-09", 99999)
 
     # Verify rank check constraint (rank < 1)
     with pytest.raises(sqlite3.IntegrityError):
-        insert_ranking(initialized_db, "US", "Films", 0, "2026-08-09", item_id_1)
+        insert_ranking(initialized_db, "US", "Movies", 0, "2026-08-09", item_id_1)
 
     # Verify rank check constraint (rank > 10)
     with pytest.raises(sqlite3.IntegrityError):
-        insert_ranking(initialized_db, "US", "Films", 11, "2026-08-09", item_id_1)
+        insert_ranking(initialized_db, "US", "Movies", 11, "2026-08-09", item_id_1)
 
     # Verify category check constraint
     with pytest.raises(sqlite3.IntegrityError):
         insert_ranking(initialized_db, "US", "Invalid Category", 3, "2026-08-09", item_id_1)
 
     # Retrieve active rankings and check sorting/joins
-    rankings = get_active_rankings(initialized_db, "US", "Films", "2026-08-09")
+    rankings = get_active_rankings(initialized_db, "US", "Movies", "2026-08-09")
     assert len(rankings) == 2
     assert rankings[0]['rank'] == 1
     assert rankings[0]['title'] == "Movie 1"
@@ -235,7 +235,7 @@ def test_rankings_api_and_constraints(initialized_db):
 
     # Clear rankings for the week
     clear_rankings_for_week(initialized_db, "2026-08-09")
-    rankings = get_active_rankings(initialized_db, "US", "Films", "2026-08-09")
+    rankings = get_active_rankings(initialized_db, "US", "Movies", "2026-08-09")
     assert len(rankings) == 0
 
 def test_orphan_lookup(initialized_db):
@@ -244,13 +244,13 @@ def test_orphan_lookup(initialized_db):
     item_id_3 = upsert_media_item(initialized_db, "Movie 3", "movie", 2024, None, "Movie 3 (2024)")
 
     # Rankings for week 1
-    insert_ranking(initialized_db, "US", "Films", 1, "2026-08-02", item_id_1)
-    insert_ranking(initialized_db, "US", "Films", 2, "2026-08-02", item_id_2)
-    insert_ranking(initialized_db, "US", "Films", 3, "2026-08-02", item_id_3)
+    insert_ranking(initialized_db, "US", "Movies", 1, "2026-08-02", item_id_1)
+    insert_ranking(initialized_db, "US", "Movies", 2, "2026-08-02", item_id_2)
+    insert_ranking(initialized_db, "US", "Movies", 3, "2026-08-02", item_id_3)
 
     # Rankings for week 2: only Movie 1 and Movie 2 are present
-    insert_ranking(initialized_db, "US", "Films", 1, "2026-08-09", item_id_1)
-    insert_ranking(initialized_db, "US", "Films", 2, "2026-08-09", item_id_2)
+    insert_ranking(initialized_db, "US", "Movies", 1, "2026-08-09", item_id_1)
+    insert_ranking(initialized_db, "US", "Movies", 2, "2026-08-09", item_id_2)
 
     # For week 2026-08-09, Movie 3 has no rankings and is therefore orphaned
     orphans = get_orphaned_media_items(initialized_db, "2026-08-09")

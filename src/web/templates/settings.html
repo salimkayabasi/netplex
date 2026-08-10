@@ -138,13 +138,13 @@
         <input type="hidden" name="trailer_subtitles" id="hidden_trailer_subtitles">
         <input type="hidden" name="log_level" id="hidden_log_level">
 
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
             <div>
                 <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
                     🌍 Monitored Regions & Content Formats
                 </h2>
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                    Select which Netflix Top 10 countries to monitor and choose content formats (Movies / TV Shows).
+                    Select a Netflix Top 10 country from the dropdown, choose content formats, and click Add.
                 </p>
             </div>
             
@@ -154,66 +154,140 @@
             </button>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
-            {% for c in available_countries %}
-            {% set is_checked = c.code in monitored_dict %}
-            {% set fmt = monitored_dict.get(c.code, 'movie,tv') %}
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.8rem 1rem;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; color: var(--text-primary);">
-                        <input type="checkbox" name="country_code" value="{{ c.code }}" {% if is_checked %}checked{% endif %}
-                               style="width: 16px; height: 16px; accent-color: var(--netflix-red);">
-                        <span>{{ c.name }} ({{ c.code }})</span>
-                    </label>
-                </div>
-                
-                <div style="display: flex; gap: 1rem; padding-left: 1.5rem; font-size: 0.82rem; color: var(--text-secondary);">
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
-                        <input type="checkbox" name="format_movie_{{ c.code }}" value="movie" {% if 'movie' in fmt or not is_checked %}checked{% endif %}
-                               style="accent-color: var(--netflix-red);">
+        <!-- Add Region Control Bar -->
+        <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem;">
+            <div style="flex: 1; min-width: 220px;">
+                <label for="add-country-select" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    Select Country / Region
+                </label>
+                <select id="add-country-select" style="width: 100%; background: #141414; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                    {% for c in available_countries %}
+                    <option value="{{ c.code }}">{{ c.name }} ({{ c.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="min-width: 200px;">
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    Content Formats
+                </label>
+                <div style="display: flex; gap: 1rem; align-items: center; height: 38px;">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
+                        <input type="checkbox" id="add-format-movie" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
                         Movies
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
-                        <input type="checkbox" name="format_tv_{{ c.code }}" value="tv" {% if 'tv' in fmt or not is_checked %}checked{% endif %}
-                               style="accent-color: var(--netflix-red);">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
+                        <input type="checkbox" id="add-format-tv" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
                         TV Shows
                     </label>
                 </div>
+            </div>
+
+            <div style="align-self: flex-end;">
+                <button type="button" onclick="addMonitoredRegion()"
+                        style="background-color: #27ae60; color: #fff; border: none; padding: 0.65rem 1.25rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
+                    ➕ Add Region
+                </button>
+            </div>
+        </div>
+
+        <!-- Monitored Regions List Container -->
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            Currently Monitored Regions
+        </h3>
+        <div id="monitored-regions-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+            {% for item in monitored_countries %}
+            {% set c_code = item.country_code.upper() %}
+            {% set fmt = item.formats %}
+            <div id="region-card-{{ c_code }}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+                <input type="hidden" name="country_code" value="{{ c_code }}">
+                <div>
+                    <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+                        {{ c_code }}
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
+                        <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                            <input type="checkbox" name="format_movie_{{ c_code }}" value="movie" {% if 'movie' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
+                            Movies
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                            <input type="checkbox" name="format_tv_{{ c_code }}" value="tv" {% if 'tv' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
+                            TV Shows
+                        </label>
+                    </div>
+                </div>
+                <button type="button" onclick="removeMonitoredRegion('{{ c_code }}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+                    🗑️ Remove
+                </button>
             </div>
             {% endfor %}
         </div>
     </form>
 </div>
 
-<!-- Full-width Section: Live Log Console Streamer -->
-<div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.75rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-        <div>
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                📜 Application Log Console
-            </h2>
-            <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                Live tail of the last 100 log entries from application runtime.
-            </p>
-        </div>
+<script>
+const availableCountriesMap = {
+    {% for c in available_countries %}
+    "{{ c.code }}": "{{ c.name }}",
+    {% endfor %}
+};
 
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <label style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-                <input type="checkbox" id="auto-refresh-logs" checked style="accent-color: var(--netflix-red);">
-                Auto-Refresh (5s)
-            </label>
-            <button type="button" onclick="fetchLogs()"
-                    style="background-color: rgba(255,255,255,0.1); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.2); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
-                🔄 Refresh Logs
+function addMonitoredRegion() {
+    const code = document.getElementById('add-country-select').value;
+    const movieChecked = document.getElementById('add-format-movie').checked;
+    const tvChecked = document.getElementById('add-format-tv').checked;
+
+    if (!movieChecked && !tvChecked) {
+        alert("Please select at least one content format (Movies or TV Shows).");
+        return;
+    }
+
+    const container = document.getElementById('monitored-regions-list');
+    let existingCard = document.getElementById(`region-card-${code}`);
+
+    if (existingCard) {
+        const movieChk = existingCard.querySelector(`input[name="format_movie_${code}"]`);
+        const tvChk = existingCard.querySelector(`input[name="format_tv_${code}"]`);
+        if (movieChk) movieChk.checked = movieChecked;
+        if (tvChk) tvChk.checked = tvChecked;
+        return;
+    }
+
+    const name = availableCountriesMap[code] || code;
+    const cardHtml = `
+        <div id="region-card-${code}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <input type="hidden" name="country_code" value="${code}">
+            <div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+                    ${name} (${code})
+                </div>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                        <input type="checkbox" name="format_movie_${code}" value="movie" ${movieChecked ? 'checked' : ''} style="accent-color: var(--netflix-red);">
+                        Movies
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                        <input type="checkbox" name="format_tv_${code}" value="tv" ${tvChecked ? 'checked' : ''} style="accent-color: var(--netflix-red);">
+                        TV Shows
+                    </label>
+                </div>
+            </div>
+            <button type="button" onclick="removeMonitoredRegion('${code}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+                🗑️ Remove
             </button>
         </div>
-    </div>
+    `;
 
-    <pre id="log-console"
-         style="background-color: #0d0d0d; color: #33ff57; border: 1px solid rgba(255,255,255,0.1); font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; padding: 1rem; border-radius: 6px; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">Loading application logs...</pre>
-</div>
+    container.insertAdjacentHTML('beforeend', cardHtml);
+}
 
-<script>
+function removeMonitoredRegion(code) {
+    const card = document.getElementById(`region-card-${code}`);
+    if (card) {
+        card.remove();
+    }
+}
+
 function syncHiddenFields() {
     document.getElementById('hidden_plex_url').value = document.getElementById('plex_url').value;
     document.getElementById('hidden_plex_token').value = document.getElementById('plex_token').value;
@@ -240,7 +314,6 @@ async function startPlexPinAuth() {
         }
         const data = await resp.json();
         
-        // Open Plex authorization URL in popup
         const width = 600, height = 700;
         const left = (window.screen.width / 2) - (width / 2);
         const top = (window.screen.height / 2) - (height / 2);
@@ -330,44 +403,11 @@ async function pollCrawlStatus() {
                 badge.style.color = "var(--text-secondary)";
                 btn.disabled = false;
                 btn.textContent = "▶ Trigger Manual Crawl Job";
-                fetchLogs();
             }
         } catch (e) {
             console.error(e);
         }
     }, 3000);
 }
-
-// Live Log Viewer Streamer
-async function fetchLogs() {
-    const consoleElem = document.getElementById('log-console');
-    try {
-        const resp = await fetch('/api/logs');
-        if (!resp.ok) {
-            consoleElem.textContent = "Unable to load log contents.";
-            return;
-        }
-        const data = await resp.json();
-        if (data.lines && data.lines.length > 0) {
-            consoleElem.textContent = data.lines.join('\n');
-        } else {
-            consoleElem.textContent = "No log output recorded yet.";
-        }
-        consoleElem.scrollTop = consoleElem.scrollHeight;
-    } catch (err) {
-        consoleElem.textContent = `Log fetch error: ${err.message}`;
-    }
-}
-
-// Initial fetch and auto-refresh timer for logs
-document.addEventListener('DOMContentLoaded', () => {
-    fetchLogs();
-    setInterval(() => {
-        const autoRefreshChecked = document.getElementById('auto-refresh-logs')?.checked;
-        if (autoRefreshChecked) {
-            fetchLogs();
-        }
-    }, 5000);
-});
 </script>
 {% endblock %}

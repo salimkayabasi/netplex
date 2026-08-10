@@ -88,10 +88,10 @@ def test_find_tudum_page_fallback_success(mock_urlopen):
 
 @patch('urllib.request.urlopen')
 def test_find_tudum_page_completely_fails(mock_urlopen):
-    # Direct and fallback both fail, defaults back to generated direct URL
+    # Direct and fallback both fail, returns None to avoid 404 logs
     mock_urlopen.side_effect = Exception("All connections fail")
     url = find_tudum_page("Stranger Things", "tv", 2026)
-    assert url == "https://www.netflix.com/tudum/stranger-things"
+    assert url is None
 
 def test_extract_trailer_assets_with_fixture():
     # Use real fixture file to test extraction logic

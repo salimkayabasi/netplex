@@ -1,29 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}NetPlex Top 10 - {{ selected_country }}{% endblock %}
+{% block title %}NetPlex Top 10{% if selected_country %} - {{ selected_country }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="section-header">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
         <div>
             <h1 class="section-title">
+                {% if selected_country %}
                 Netflix Top 10 in {{ selected_country }}
+                {% else %}
+                Welcome to NetPlex
+                {% endif %}
             </h1>
             <p class="section-subtitle">
-                Week: {{ current_week if current_week else 'Latest' }}
+                {% if current_week %}Week: {{ current_week }}{% else %}Netflix Top 10 Proxy & Downloader{% endif %}
             </p>
         </div>
 
+        {% if selected_country %}
         <div class="filter-tabs">
-            <a href="/?country={{ selected_country }}&category=Films" 
-               class="tab-btn {% if selected_category == 'Films' %}active{% endif %}">
-                Films
+            <a href="/?country={{ selected_country }}&category=Movies" 
+               class="tab-btn {% if selected_category == 'Movies' %}active{% endif %}">
+                Movies
             </a>
             <a href="/?country={{ selected_country }}&category=TV" 
                class="tab-btn {% if selected_category == 'TV' %}active{% endif %}">
                 TV Shows
             </a>
         </div>
+        {% endif %}
     </div>
 </div>
 
@@ -59,9 +65,21 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state">
-    <h3>No Top 10 Data Available</h3>
-    <p>There are currently no rankings recorded for {{ selected_country }} ({{ selected_category }}).</p>
-</div>
+    {% if not selected_country %}
+    <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.15);">
+        <h3 style="font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary);">No Monitored Regions Configured</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; max-width: 520px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+            NetPlex is currently unconfigured. Please select countries and content formats (Movies/TV Shows) in Settings to enable Top 10 rankings monitoring.
+        </p>
+        <a href="/settings" class="tab-btn active" style="text-decoration: none; padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; background-color: var(--netflix-red); border: none; color: #fff; border-radius: 4px;">
+            ⚙️ Configure Monitored Regions
+        </a>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No Top 10 Data Available</h3>
+        <p>There are currently no rankings recorded for {{ selected_country }} ({{ selected_category }}).</p>
+    </div>
+    {% endif %}
 {% endif %}
 {% endblock %}

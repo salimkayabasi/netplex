@@ -83,7 +83,7 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
             # Category Mapping
             raw_category = row.get('category', '')
             if raw_category.startswith('Films'):
-                category = 'Films'
+                category = 'Movies'
                 item_type = 'movie'
             elif raw_category.startswith('TV'):
                 category = 'TV'

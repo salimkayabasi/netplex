@@ -115,7 +115,7 @@ def download_and_cache_tudum_css(config_dir: str = "/config", html_content: Opti
 def landing_page(
     request: Request,
     country: Optional[str] = Query(None),
-    category: str = Query("Films")
+    category: str = Query("Movies")
 ):
     db_path = get_db_path(request)
     
@@ -131,7 +131,10 @@ def landing_page(
         if monitored:
             selected_country = monitored[0]["country_code"]
         else:
-            selected_country = "US"
+            selected_country = None
+    elif monitored and not any(m["country_code"] == selected_country for m in monitored):
+        # Fallback to first monitored if specified country is not monitored
+        selected_country = monitored[0]["country_code"]
 
     # Get latest week from rankings table
     latest_week = ""
