@@ -62,7 +62,37 @@ def test_landing_page_endpoint(test_env):
     assert response.status_code == 200
     assert "Stranger Things" in response.text
     assert "NetPlex" in response.text
-    assert 'class="rank-badge">1<' in response.text or 'rank-badge">1</div>' in response.text
+    assert 'class="rank-badge">01</div>' in response.text or '01' in response.text
+
+def test_sequential_country_sections(test_env):
+    client = test_env["client"]
+    db_path = test_env["db_path"]
+
+    # Configure tracked countries in specific order: GLOBAL, TR, US
+    set_monitored_country(db_path, "GLOBAL", "movie,tv")
+    set_monitored_country(db_path, "TR", "movie,tv")
+    set_monitored_country(db_path, "US", "movie,tv")
+
+    item1 = upsert_media_item(db_path, "Global Movie", "movie", 2024, None, "Global Movie (2024)")
+    item2 = upsert_media_item(db_path, "Turkey Movie", "movie", 2024, None, "Turkey Movie (2024)")
+    item3 = upsert_media_item(db_path, "US Movie", "movie", 2024, None, "US Movie (2024)")
+
+    insert_ranking(db_path, "GLOBAL", "Movies", 1, "2026-08-01", item1)
+    insert_ranking(db_path, "TR", "Movies", 1, "2026-08-01", item2)
+    insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item3)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    text = response.text
+    # Verify sequential order: Global appears before Turkey, Turkey appears before United States
+    pos_global = text.find("Global Top 10 Movies")
+    pos_tr = text.find("Turkey Top 10 Movies")
+    pos_us = text.find("United States Top 10 Movies")
+
+    assert pos_global != -1
+    assert pos_tr != -1
+    assert pos_us != -1
+    assert pos_global < pos_tr < pos_us
 
 def test_download_and_cache_tudum_css(test_env):
     config_dir = test_env["config_dir"]

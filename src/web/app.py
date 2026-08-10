@@ -111,6 +111,24 @@ def download_and_cache_tudum_css(config_dir: str = "/config", html_content: Opti
 
     return target_css_path
 
+COUNTRY_NAMES = {
+    "GLOBAL": "Global",
+    "US": "United States",
+    "GB": "United Kingdom",
+    "CA": "Canada",
+    "AU": "Australia",
+    "DE": "Germany",
+    "FR": "France",
+    "ES": "Spain",
+    "IT": "Italy",
+    "JP": "Japan",
+    "KR": "South Korea",
+    "BR": "Brazil",
+    "MX": "Mexico",
+    "IN": "India",
+    "TR": "Turkey"
+}
+
 @app.get("/", response_class=HTMLResponse)
 def landing_page(
     request: Request,
@@ -119,22 +137,12 @@ def landing_page(
 ):
     db_path = get_db_path(request)
     
-    # Get monitored countries
+    # Get monitored countries in settings menu insertion order
     monitored = []
     try:
         monitored = get_monitored_countries(db_path)
     except Exception:
         pass
-
-    selected_country = country
-    if not selected_country:
-        if monitored:
-            selected_country = monitored[0]["country_code"]
-        else:
-            selected_country = None
-    elif monitored and not any(m["country_code"] == selected_country for m in monitored):
-        # Fallback to first monitored if specified country is not monitored
-        selected_country = monitored[0]["country_code"]
 
     # Get latest week from rankings table
     latest_week = ""
@@ -148,12 +156,35 @@ def landing_page(
     except Exception:
         pass
 
-    rankings = []
-    if selected_country and latest_week:
-        try:
-            rankings = get_active_rankings(db_path, selected_country, category, latest_week)
-        except Exception:
-            pass
+    selected_country = country
+    if not selected_country and monitored:
+        selected_country = monitored[0]["country_code"]
+
+    # Build country sections in the exact order set from the settings menu
+    country_sections = []
+    countries_to_render = monitored
+    if country:
+        matched = [m for m in monitored if m["country_code"] == country]
+        if matched:
+            countries_to_render = matched
+
+    for m in countries_to_render:
+        code = m["country_code"]
+        name = COUNTRY_NAMES.get(code, code)
+        rankings_for_country = []
+        if latest_week:
+            try:
+                rankings_for_country = get_active_rankings(db_path, code, category, latest_week)
+            except Exception:
+                pass
+        country_sections.append({
+            "country_code": code,
+            "country_name": name,
+            "formats": m.get("formats", "movie,tv"),
+            "rankings": rankings_for_country
+        })
+
+    primary_rankings = country_sections[0]["rankings"] if country_sections else []
 
     return templates.TemplateResponse(
         request=request,
@@ -163,7 +194,8 @@ def landing_page(
             "selected_country": selected_country,
             "selected_category": category,
             "current_week": latest_week,
-            "rankings": rankings
+            "rankings": primary_rankings,
+            "country_sections": country_sections
         }
     )
 

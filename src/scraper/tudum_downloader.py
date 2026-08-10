@@ -7,7 +7,8 @@ import logging
 from src.database import (
     _get_connection,
     get_setting,
-    update_media_item_status
+    update_media_item_status,
+    update_media_item_poster
 )
 from src.metadata.nfo_generator import (
     generate_nfo_xml,
@@ -77,7 +78,7 @@ def find_tudum_page(title: str, item_type: str, year: int) -> str | None:
 def extract_trailer_assets(tudum_url: str | None) -> dict:
     """Fetches the HTML of the Tudum page, extracts the unescaped graphql models, and locates media assets."""
     if not tudum_url:
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
     content = ""
     try:
         req = urllib.request.Request(tudum_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -91,10 +92,10 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
             logger.info(f"Tudum page not found (404) for URL: {tudum_url}")
         else:
             logger.warning(f"HTTP Error {e.code} fetching {tudum_url}")
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
     except Exception as e:
         logger.warning(f"Error fetching page {tudum_url}: {e}")
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None}
+        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
         
     # Unescape the graphql models block if present
     match = re.search(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\)", content)
@@ -113,6 +114,12 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     # Find all double-quoted URLs containing .vtt or .srt
     subtitle_urls = re.findall(r'"((?:https?://|/)[^"]+?\.(?:vtt|srt)[^"]*)"', content)
     subtitle_url = sanitize_url(subtitle_urls[0]) if subtitle_urls else None
+
+    # Extract poster URL (og:image)
+    poster_url = None
+    og_img_match = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']', content, re.IGNORECASE)
+    if og_img_match:
+        poster_url = sanitize_url(og_img_match.group(1))
     
     # Extract synopsis / plot
     plot = None
@@ -142,7 +149,8 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         "video_url": video_url,
         "subtitle_url": subtitle_url,
         "plot": plot,
-        "netflix_id": netflix_id
+        "netflix_id": netflix_id,
+        "poster_url": poster_url
     }
 
 def download_file(url: str, output_path: str):
@@ -283,6 +291,9 @@ def download_pending_trailers(db_path: str, media_dir: str = None):
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
             assets = extract_trailer_assets(tudum_url)
             
+            if assets.get("poster_url"):
+                update_media_item_poster(db_path, item['id'], assets["poster_url"])
+
             if not assets["video_url"]:
                 logger.warning(f"No video URL found for {item['title']}. Marking as failed.")
                 update_media_item_status(db_path, item['id'], 'failed')

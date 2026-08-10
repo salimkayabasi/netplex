@@ -1,13 +1,13 @@
 /* NetPlex Tudum Base Stylesheet */
 :root {
     --bg-dark: #141414;
-    --bg-card: #1f1f1f;
+    --bg-card: #181818;
     --netflix-red: #E50914;
     --text-primary: #FFFFFF;
     --text-secondary: #B3B3B3;
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --radius-md: 8px;
-    --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --radius-md: 6px;
+    --shadow-card: 0 6px 18px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -32,7 +32,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 1.25rem 2.5rem;
-    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(20,20,20,0) 100%);
+    background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0) 100%);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -87,7 +87,7 @@ body {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
-.filter-tabs {
+.filter-tabs, .category-toggle-container {
     display: flex;
     background-color: rgba(255, 255, 255, 0.05);
     padding: 0.25rem;
@@ -99,11 +99,12 @@ body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 0.4rem 1rem;
+    padding: 0.4rem 1.2rem;
     font-size: 0.9rem;
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
+    text-decoration: none;
     transition: all 0.2s ease;
 }
 
@@ -125,40 +126,60 @@ body {
     width: 100%;
 }
 
+.top-controls-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 1.5rem;
+}
+
+/* Country Sections (Sequential Display) */
+.country-section {
+    margin-bottom: 3.5rem;
+}
+
 .section-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1.25rem;
 }
 
 .section-title {
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: 800;
-    display: flex;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+}
+
+/* Date Info Badge */
+.week-info-badge {
+    display: inline-flex;
     align-items: center;
-    gap: 0.75rem;
-}
-
-.section-subtitle {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 0.25rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 600;
     color: var(--text-secondary);
-    font-size: 0.95rem;
-    margin-top: 0.25rem;
+    margin-top: 0.4rem;
+    user-select: none;
 }
 
-/* Grid Layout */
+/* Multi-Line Grid Layout for all 10 items */
 .ranking-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 2rem;
-    padding: 1rem 0;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 1.75rem 1.25rem;
+    padding: 0.5rem 0;
 }
 
-/* Top 10 Media Card */
+/* Top 10 Media Card (Portrait 2:3 Aspect Ratio) */
 .media-card {
     position: relative;
     background-color: var(--bg-card);
     border-radius: var(--radius-md);
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.25s ease;
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow-card);
@@ -166,58 +187,81 @@ body {
 }
 
 .media-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 12px 32px rgba(229, 9, 20, 0.25);
+    transform: scale(1.04);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
     z-index: 10;
 }
 
-/* Big Stylized Rank Indicator (1-10) */
+/* Rank Number Badge (Tudum Original Thin White Outline Overlay top-left inside card) */
 .rank-badge {
     position: absolute;
-    top: -10px;
-    left: -10px;
-    font-size: 5rem;
-    font-weight: 900;
+    top: 8px;
+    left: 12px;
+    font-size: 3.8rem;
+    font-weight: 800;
     line-height: 1;
-    color: rgba(255, 255, 255, 0.15);
-    -webkit-text-stroke: 2px var(--netflix-red);
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.85);
+    text-stroke: 1.5px rgba(255, 255, 255, 0.85);
     user-select: none;
-    z-index: 2;
+    z-index: 5;
     pointer-events: none;
-    font-family: Impact, "Arial Black", sans-serif;
+    font-family: var(--font-family);
+    letter-spacing: -2px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
 }
 
 .card-poster {
     position: relative;
     width: 100%;
-    aspect-ratio: 16/9;
-    background-color: #2a2a2a;
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(180deg, #2a2a2a 0%, #151515 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.card-poster-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .card-poster-placeholder {
+    padding: 1.5rem 1rem;
+    text-align: center;
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #2b2b2b 0%, #1f1f1f 100%);
-    color: var(--text-secondary);
-    font-size: 2.5rem;
+    background: linear-gradient(135deg, #2b2b2b 0%, #181818 100%);
 }
 
+.poster-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #ffffff;
+    line-height: 1.2;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+/* Simple Play Overlay on Hover */
 .play-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
 }
 
 .media-card:hover .play-overlay {
@@ -225,16 +269,16 @@ body {
 }
 
 .play-btn-circle {
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background-color: var(--netflix-red);
     color: var(--text-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    font-size: 1.1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     transform: scale(0.9);
     transition: transform 0.2s ease;
 }
@@ -244,14 +288,15 @@ body {
 }
 
 .card-info {
-    padding: 1rem;
+    padding: 0.85rem 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+    background-color: var(--bg-card);
 }
 
 .card-title {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
@@ -262,7 +307,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
 }
 
@@ -290,6 +335,11 @@ body {
 .status-pending {
     background-color: rgba(241, 196, 15, 0.2);
     color: #f1c40f;
+}
+
+.status-failed {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
 }
 
 /* Modal Overlay */
@@ -365,9 +415,9 @@ body {
     object-fit: contain;
 }
 
-.empty-state {
+.country-empty-state, .empty-state {
     text-align: center;
-    padding: 4rem 2rem;
+    padding: 2rem 1rem;
     color: var(--text-secondary);
 }
 
