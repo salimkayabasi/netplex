@@ -52,11 +52,13 @@ def init_db(db_path: str = "/config/netplex.db"):
                     UNIQUE(title, type, release_year, season_name)
                 )
             """)
-            # Check if poster_url column exists for existing DBs
+            # Check if poster_url and local_title columns exist for existing DBs
             cursor = conn.execute("PRAGMA table_info(media_items)")
             columns = [row['name'] for row in cursor.fetchall()]
             if 'poster_url' not in columns:
                 conn.execute("ALTER TABLE media_items ADD COLUMN poster_url TEXT")
+            if 'local_title' not in columns:
+                conn.execute("ALTER TABLE media_items ADD COLUMN local_title TEXT")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS rankings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,7 +160,7 @@ def remove_monitored_country(db_path: str, country_code: str):
     finally:
         conn.close()
 
-def upsert_media_item(db_path: str, title: str, type: str, release_year: int, season_name: str | None, folder_name: str) -> int:
+def upsert_media_item(db_path: str, title: str, type: str, release_year: int, season_name: str | None, folder_name: str, local_title: str | None = None) -> int:
     conn = _get_connection(db_path)
     try:
         with conn:
@@ -169,15 +171,21 @@ def upsert_media_item(db_path: str, title: str, type: str, release_year: int, se
             row = cursor.fetchone()
             if row:
                 media_item_id = row['id']
-                conn.execute(
-                    "UPDATE media_items SET last_seen_at = CURRENT_TIMESTAMP, folder_name = ? WHERE id = ?",
-                    (folder_name, media_item_id)
-                )
+                if local_title:
+                    conn.execute(
+                        "UPDATE media_items SET last_seen_at = CURRENT_TIMESTAMP, folder_name = ?, local_title = ? WHERE id = ?",
+                        (folder_name, local_title, media_item_id)
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE media_items SET last_seen_at = CURRENT_TIMESTAMP, folder_name = ? WHERE id = ?",
+                        (folder_name, media_item_id)
+                    )
                 return media_item_id
             else:
                 cursor = conn.execute(
-                    "INSERT INTO media_items (title, type, release_year, season_name, folder_name, status) VALUES (?, ?, ?, ?, ?, 'pending')",
-                    (title, type, release_year, season_name, folder_name)
+                    "INSERT INTO media_items (title, local_title, type, release_year, season_name, folder_name, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
+                    (title, local_title, type, release_year, season_name, folder_name)
                 )
                 return cursor.lastrowid
     finally:
@@ -211,6 +219,17 @@ def update_media_item_poster(db_path: str, item_id: int, poster_url: str):
     finally:
         conn.close()
 
+def update_media_item_local_title(db_path: str, item_id: int, local_title: str):
+    conn = _get_connection(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE media_items SET local_title = ? WHERE id = ?",
+                (local_title, item_id)
+            )
+    finally:
+        conn.close()
+
 def clear_rankings_for_week(db_path: str, week: str):
     conn = _get_connection(db_path)
     try:
@@ -236,7 +255,7 @@ def get_active_rankings(db_path: str, country_code: str, category: str, week: st
         cursor = conn.execute("""
             SELECT 
                 r.id AS ranking_id, r.country_code, r.category, r.rank, r.week,
-                m.id AS media_item_id, m.title, m.type, m.release_year, m.season_name, m.folder_name, m.file_path, m.poster_url, m.status, m.added_at, m.last_seen_at
+                m.id AS media_item_id, m.title, m.local_title, m.type, m.release_year, m.season_name, m.folder_name, m.file_path, m.poster_url, m.status, m.added_at, m.last_seen_at
             FROM rankings r
             JOIN media_items m ON r.media_item_id = m.id
             WHERE r.country_code = ? AND r.category = ? AND r.week = ?

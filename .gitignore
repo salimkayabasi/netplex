@@ -1,4 +1,5 @@
 # Workspace / Project Ignore Rules
+*.tsv
 
 
 # Virtual Environment

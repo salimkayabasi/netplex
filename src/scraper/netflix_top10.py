@@ -7,8 +7,91 @@ from src.database import (
     get_monitored_countries,
     upsert_media_item,
     insert_ranking,
-    clear_rankings_for_week
+    clear_rankings_for_week,
+    update_media_item_poster
 )
+import http.client
+import json
+
+COUNTRY_SLUGS = {
+    'GLOBAL': '', 'US': 'united-states', 'GB': 'united-kingdom',
+    'CA': 'canada', 'AU': 'australia', 'DE': 'germany',
+    'FR': 'france', 'ES': 'spain', 'IT': 'italy',
+    'JP': 'japan', 'KR': 'south-korea', 'BR': 'brazil',
+    'MX': 'mexico', 'IN': 'india', 'TR': 'turkey'
+}
+
+def fetch_country_top10_metadata(country_code: str) -> dict:
+    slug = COUNTRY_SLUGS.get(country_code.upper(), '')
+    url = f"https://www.netflix.com/tudum/top10/{slug}".rstrip('/')
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            html = resp.read().decode('utf-8')
+    except http.client.IncompleteRead as e:
+        html = e.partial.decode('utf-8', errors='ignore')
+    except Exception:
+        return {}
+
+    match = re.search(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\)", html)
+    if not match:
+        return {}
+        
+    try:
+        data = json.loads(match.group(1).encode('utf-8').decode('unicode_escape'))
+    except Exception:
+        return {}
+
+    mapping = {}
+    for k, v in data.get('data', {}).items():
+        if 'PulseTop10ItemEntity' in k and v.get('top10Video'):
+            vid = v['top10Video']['videoId']
+            title = v['top10Video']['title']
+            art = v.get('artwork', {})
+            poster = None
+            for art_key in ['storyArt', 'sdpArt', 'logoArt']:
+                if art.get(art_key):
+                    urls_sized = (art[art_key].get('urlsSized({\"sizes\":{\"height\":675,\"width\":1200}})') or
+                                  art[art_key].get('urlsSized({\"sizes\":{\"height\":219,\"width\":390}})') or
+                                  art[art_key].get('urlsSized({\"sizes\":{\"height\":153,\"width\":360}})'))
+                    if urls_sized and len(urls_sized) > 0:
+                        poster = urls_sized[0].get('url')
+                        break
+            mapping[title.lower().strip()] = {
+                'netflix_id': vid,
+                'title': title,
+                'poster_url': poster
+            }
+    return mapping
+
+def fetch_local_title(netflix_id: int, country_code: str) -> str | None:
+    if not netflix_id:
+        return None
+    cc = country_code.lower()
+    if cc == 'global':
+        cc = 'tr'
+    url = f"https://www.netflix.com/{cc}/title/{netflix_id}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            'Accept-Language': f'{cc}-{cc.upper()},{cc};q=0.9,en-US;q=0.8,en;q=0.7'
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read().decode('utf-8')
+    except http.client.IncompleteRead as e:
+        html = e.partial.decode('utf-8', errors='ignore')
+    except Exception:
+        return None
+
+    h1 = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
+    if h1:
+        clean = re.sub(r'<[^>]+>', '', h1.group(1)).strip()
+        if clean:
+            return clean
+    return None
 
 def fetch_top10_tsv(url: str, cache_path: str) -> str:
     """Stream-downloads the TSV dataset and caches it locally to avoid redundant downloads."""
@@ -125,12 +208,25 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
             # Format folder name
             folder_name = f"{title} ({year})"
             
+            # Extract views and hours for ranking
+            views = 0
+            try:
+                views = int(row.get('weekly_views') or 0)
+            except ValueError:
+                views = 0
+                
+            hours = 0
+            try:
+                hours = int(row.get('weekly_hours_viewed') or 0)
+            except ValueError:
+                hours = 0
+
             # Rank
             try:
                 rank = int(row.get('weekly_rank', '0'))
             except ValueError:
-                continue
-                
+                rank = 0
+
             parsed_results.append({
                 'country_code': country_code,
                 'category': category,
@@ -139,9 +235,22 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
                 'type': item_type,
                 'release_year': year,
                 'season_name': season_name,
-                'folder_name': folder_name
+                'folder_name': folder_name,
+                'views': views,
+                'hours': hours
             })
             
+    if not is_country_tsv:
+        final_results = []
+        for cat in ['Movies', 'TV']:
+            cat_items = [item for item in parsed_results if item['category'] == cat]
+            cat_items.sort(key=lambda x: (x['views'], x['hours']), reverse=True)
+            top10 = cat_items[:10]
+            for idx, item in enumerate(top10):
+                item['rank'] = idx + 1
+                final_results.append(item)
+        return final_results
+        
     return parsed_results
 
 def crawl_netflix_top10(db_path: str):
@@ -162,6 +271,7 @@ def crawl_netflix_top10(db_path: str):
     country_configs = [c for c in countries_config if c['country_code'].upper() != 'GLOBAL']
     
     cleared_weeks = set()
+    metadata_cache = {}
     
     # Process Global rankings
     if global_config:
@@ -176,16 +286,27 @@ def crawl_netflix_top10(db_path: str):
             if latest_week not in cleared_weeks:
                 clear_rankings_for_week(db_path, latest_week)
                 cleared_weeks.add(latest_week)
-                
+
+            meta_map = fetch_country_top10_metadata('GLOBAL')
+            
             for item in parsed_data:
+                meta = meta_map.get(item['title'].lower().strip(), {})
+                poster_url = meta.get('poster_url')
+                netflix_id = meta.get('netflix_id')
+                local_title = fetch_local_title(netflix_id, 'GLOBAL') if netflix_id else None
+
                 media_item_id = upsert_media_item(
                     db_path,
                     title=item['title'],
                     type=item['type'],
                     release_year=item['release_year'],
                     season_name=item['season_name'],
-                    folder_name=item['folder_name']
+                    folder_name=item['folder_name'],
+                    local_title=local_title
                 )
+                if poster_url:
+                    update_media_item_poster(db_path, media_item_id, poster_url)
+
                 insert_ranking(
                     db_path,
                     country_code=item['country_code'],
@@ -210,14 +331,27 @@ def crawl_netflix_top10(db_path: str):
                 cleared_weeks.add(latest_week)
                 
             for item in parsed_data:
+                cc = item['country_code']
+                if cc not in metadata_cache:
+                    metadata_cache[cc] = fetch_country_top10_metadata(cc)
+                meta_map = metadata_cache[cc]
+                meta = meta_map.get(item['title'].lower().strip(), {})
+                poster_url = meta.get('poster_url')
+                netflix_id = meta.get('netflix_id')
+                local_title = fetch_local_title(netflix_id, cc) if netflix_id else None
+
                 media_item_id = upsert_media_item(
                     db_path,
                     title=item['title'],
                     type=item['type'],
                     release_year=item['release_year'],
                     season_name=item['season_name'],
-                    folder_name=item['folder_name']
+                    folder_name=item['folder_name'],
+                    local_title=local_title
                 )
+                if poster_url:
+                    update_media_item_poster(db_path, media_item_id, poster_url)
+
                 insert_ranking(
                     db_path,
                     country_code=item['country_code'],

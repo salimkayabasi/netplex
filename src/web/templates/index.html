@@ -48,16 +48,15 @@
                     </div>
                 </div>
                 <div class="card-info">
-                    <div class="card-title" title="{{ item.title }}">{{ item.title }}</div>
+                    <div class="card-title" title="{% if item.local_title and item.local_title.lower() != item.title.lower() %}{{ item.title }} / {{ item.local_title }}{% else %}{{ item.title }}{% endif %}">
+                        {{ item.title }}{% if item.local_title and item.local_title.lower() != item.title.lower() %} <span style="font-weight: 400; opacity: 0.85;">/ {{ item.local_title }}</span>{% endif %}
+                    </div>
                     <div class="card-meta">
                         <span class="badge-type">{{ item.type }}</span>
                         <span>{{ item.release_year }}</span>
                         {% if item.season_name %}
                         <span>• {{ item.season_name }}</span>
                         {% endif %}
-                        <span class="badge-status status-{{ item.status }}">
-                            {{ item.status }}
-                        </span>
                     </div>
                 </div>
             </div>

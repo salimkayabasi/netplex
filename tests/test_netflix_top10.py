@@ -112,6 +112,12 @@ def test_parse_top10_data_global():
     )
     
     assert len(results) > 0
+    movies = [i for i in results if i['category'] == 'Movies']
+    tv = [i for i in results if i['category'] == 'TV']
+    assert len(movies) == 10
+    assert len(tv) == 10
+    assert [i['rank'] for i in movies] == list(range(1, 11))
+    assert [i['rank'] for i in tv] == list(range(1, 11))
     for item in results:
         assert item['country_code'] == "GLOBAL"
         assert item['category'] in ["Movies", "TV"]
