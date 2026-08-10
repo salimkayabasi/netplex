@@ -274,3 +274,54 @@ def test_init_db_creates_parent_directories_if_not_exist(tmp_path):
         assert "settings" in tables
     finally:
         conn.close()
+
+def test_tudum_metadata_fields(initialized_db):
+    item_id = upsert_media_item(
+        initialized_db,
+        title="72 HOURS",
+        type="movie",
+        release_year=2026,
+        season_name=None,
+        folder_name="72 HOURS (2026)",
+        local_title="72 Saat",
+        netflix_id=82742346,
+        show_title="72 HOURS",
+        season_title=None,
+        synopsis="After their divorce...",
+        maturity_rating="16+",
+        runtime_seconds=6300,
+        logo_url="https://img.nflx.net/logo.png",
+        video_url="https://video.nflx.net/trailer.mp4",
+        subtitle_url="https://sub.nflx.net/sub.vtt",
+        poster_url="https://img.nflx.net/poster.jpg"
+    )
+    assert item_id > 0
+
+    insert_ranking(
+        initialized_db,
+        country_code="TR",
+        category="Movies",
+        rank=1,
+        week="2026-08-02",
+        media_item_id=item_id,
+        country_name="Turkey",
+        weekly_hours_viewed=28400000,
+        weekly_views=14200000,
+        cumulative_weeks_in_top_10=3
+    )
+
+    rankings = get_active_rankings(initialized_db, "TR", "Movies", "2026-08-02")
+    assert len(rankings) == 1
+    r = rankings[0]
+    assert r['title'] == "72 HOURS"
+    assert r['local_title'] == "72 Saat"
+    assert r['netflix_id'] == 82742346
+    assert r['synopsis'] == "After their divorce..."
+    assert r['maturity_rating'] == "16+"
+    assert r['runtime_seconds'] == 6300
+    assert r['logo_url'] == "https://img.nflx.net/logo.png"
+    assert r['country_name'] == "Turkey"
+    assert r['weekly_hours_viewed'] == 28400000
+    assert r['weekly_views'] == 14200000
+    assert r['cumulative_weeks_in_top_10'] == 3
+

@@ -6,9 +6,11 @@ from fastapi.testclient import TestClient
 
 from src.web.app import app
 from src.database import init_db, get_setting, get_monitored_countries
+from src.crawler_lock import release_crawl_lock
 
 @pytest.fixture
 def client_and_db():
+    release_crawl_lock()
     with tempfile.TemporaryDirectory() as tmp_dir:
         db_path = os.path.join(tmp_dir, "test_netplex.db")
         init_db(db_path)
@@ -24,7 +26,11 @@ def client_and_db():
         app.state.config_dir = tmp_dir
         
         client = TestClient(app)
-        yield client, db_path, log_path, tmp_dir
+        try:
+            yield client, db_path, log_path, tmp_dir
+        finally:
+            release_crawl_lock()
+
 
 def test_get_settings_page(client_and_db):
     client, _, _, _ = client_and_db

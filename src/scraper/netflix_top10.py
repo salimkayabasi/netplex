@@ -47,11 +47,21 @@ def fetch_country_top10_metadata(country_code: str) -> dict:
     mapping = {}
     for k, v in data.get('data', {}).items():
         if 'PulseTop10ItemEntity' in k and v.get('top10Video'):
-            vid = v['top10Video']['videoId']
-            title = v['top10Video']['title']
+            top_vid_obj = v['top10Video']
+            vid = top_vid_obj.get('videoId')
+            title = top_vid_obj.get('title')
+            if not title:
+                continue
+            show_title = v.get('showTitle') or top_vid_obj.get('showTitle')
+            season_title = v.get('seasonTitle') or top_vid_obj.get('seasonTitle')
+            release_year = v.get('releaseYear') or top_vid_obj.get('releaseYear')
+            synopsis = v.get('shortSynopsis') or v.get('synopsis') or top_vid_obj.get('synopsis')
+            maturity_rating = v.get('maturityRating') or top_vid_obj.get('maturityRating')
+            runtime_seconds = v.get('runtimeSeconds') or top_vid_obj.get('runtimeSeconds')
+
             art = v.get('artwork', {})
             poster = None
-            for art_key in ['storyArt', 'sdpArt', 'logoArt']:
+            for art_key in ['storyArt', 'sdpArt']:
                 if art.get(art_key):
                     urls_sized = (art[art_key].get('urlsSized({\"sizes\":{\"height\":675,\"width\":1200}})') or
                                   art[art_key].get('urlsSized({\"sizes\":{\"height\":219,\"width\":390}})') or
@@ -59,10 +69,26 @@ def fetch_country_top10_metadata(country_code: str) -> dict:
                     if urls_sized and len(urls_sized) > 0:
                         poster = urls_sized[0].get('url')
                         break
+
+            logo_url = None
+            if art.get('logoArt'):
+                urls_sized = (art['logoArt'].get('urlsSized({\"sizes\":{\"height\":675,\"width\":1200}})') or
+                              art['logoArt'].get('urlsSized({\"sizes\":{\"height\":219,\"width\":390}})') or
+                              art['logoArt'].get('urlsSized({\"sizes\":{\"height\":153,\"width\":360}})'))
+                if urls_sized and len(urls_sized) > 0:
+                    logo_url = urls_sized[0].get('url')
+
             mapping[title.lower().strip()] = {
                 'netflix_id': vid,
                 'title': title,
-                'poster_url': poster
+                'show_title': show_title,
+                'season_title': season_title,
+                'release_year': release_year,
+                'synopsis': synopsis,
+                'maturity_rating': maturity_rating,
+                'runtime_seconds': runtime_seconds,
+                'poster_url': poster,
+                'logo_url': logo_url
             }
     return mapping
 
@@ -158,11 +184,13 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
                 if country_iso not in config_map:
                     continue
                 country_code = country_iso
+                country_name = row.get('country_name', '').strip() or country_iso
                 formats_allowed = config_map[country_iso]
             else:
                 if 'GLOBAL' not in config_map:
                     continue
                 country_code = 'GLOBAL'
+                country_name = 'Global'
                 formats_allowed = config_map['GLOBAL']
                 
             # Category Mapping
@@ -185,8 +213,10 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
             # Show and Season parsing
             show_title = row.get('show_title', '').strip()
             season_title = row.get('season_title', '').strip()
+            if season_title == 'N/A':
+                season_title = None
             
-            if season_title and season_title != 'N/A':
+            if season_title:
                 show_title_clean = show_title.strip()
                 season_title_clean = season_title.strip()
                 if season_title_clean.lower().startswith(show_title_clean.lower()):
@@ -223,6 +253,20 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
             except ValueError:
                 hours = 0
 
+            cum_weeks = 0
+            try:
+                cum_weeks = int(row.get('cumulative_weeks_in_top_10') or 0)
+            except ValueError:
+                cum_weeks = 0
+
+            runtime_seconds = None
+            raw_runtime = row.get('runtime')
+            if raw_runtime:
+                try:
+                    runtime_seconds = int(float(raw_runtime) * 3600)
+                except ValueError:
+                    runtime_seconds = None
+
             # Rank
             try:
                 rank = int(row.get('weekly_rank', '0'))
@@ -231,15 +275,20 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
 
             parsed_results.append({
                 'country_code': country_code,
+                'country_name': country_name,
                 'category': category,
                 'rank': rank,
                 'title': title,
+                'show_title': show_title,
+                'season_title': season_title,
                 'type': item_type,
                 'release_year': year,
                 'season_name': season_name,
                 'folder_name': folder_name,
                 'views': views,
-                'hours': hours
+                'hours': hours,
+                'cumulative_weeks': cum_weeks,
+                'runtime_seconds': runtime_seconds
             })
             
     if not is_country_tsv:
@@ -293,8 +342,15 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
             for item in parsed_data:
                 meta = meta_map.get(item['title'].lower().strip(), {})
                 poster_url = meta.get('poster_url')
+                logo_url = meta.get('logo_url')
                 netflix_id = meta.get('netflix_id')
                 local_title = fetch_local_title(netflix_id, 'GLOBAL') if netflix_id else None
+
+                show_title = meta.get('show_title') or item.get('show_title')
+                season_title = meta.get('season_title') or item.get('season_title')
+                synopsis = meta.get('synopsis')
+                maturity_rating = meta.get('maturity_rating')
+                runtime_seconds = meta.get('runtime_seconds') or item.get('runtime_seconds')
 
                 media_item_id = upsert_media_item(
                     db_path,
@@ -303,18 +359,28 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
                     release_year=item['release_year'],
                     season_name=item['season_name'],
                     folder_name=item['folder_name'],
-                    local_title=local_title
+                    local_title=local_title,
+                    netflix_id=netflix_id,
+                    show_title=show_title,
+                    season_title=season_title,
+                    synopsis=synopsis,
+                    maturity_rating=maturity_rating,
+                    runtime_seconds=runtime_seconds,
+                    logo_url=logo_url,
+                    poster_url=poster_url
                 )
-                if poster_url:
-                    update_media_item_poster(db_path, media_item_id, poster_url)
 
                 insert_ranking(
                     db_path,
                     country_code=item['country_code'],
+                    country_name=item.get('country_name', 'Global'),
                     category=item['category'],
                     rank=item['rank'],
                     week=latest_week,
-                    media_item_id=media_item_id
+                    media_item_id=media_item_id,
+                    weekly_hours_viewed=item['hours'],
+                    weekly_views=item['views'],
+                    cumulative_weeks_in_top_10=item['cumulative_weeks']
                 )
         current_task += 1
                 
@@ -346,8 +412,15 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
                 for item in items:
                     meta = meta_map.get(item['title'].lower().strip(), {})
                     poster_url = meta.get('poster_url')
+                    logo_url = meta.get('logo_url')
                     netflix_id = meta.get('netflix_id')
                     local_title = fetch_local_title(netflix_id, cc) if netflix_id else None
+
+                    show_title = meta.get('show_title') or item.get('show_title')
+                    season_title = meta.get('season_title') or item.get('season_title')
+                    synopsis = meta.get('synopsis')
+                    maturity_rating = meta.get('maturity_rating')
+                    runtime_seconds = meta.get('runtime_seconds') or item.get('runtime_seconds')
 
                     media_item_id = upsert_media_item(
                         db_path,
@@ -356,18 +429,29 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
                         release_year=item['release_year'],
                         season_name=item['season_name'],
                         folder_name=item['folder_name'],
-                        local_title=local_title
+                        local_title=local_title,
+                        netflix_id=netflix_id,
+                        show_title=show_title,
+                        season_title=season_title,
+                        synopsis=synopsis,
+                        maturity_rating=maturity_rating,
+                        runtime_seconds=runtime_seconds,
+                        logo_url=logo_url,
+                        poster_url=poster_url
                     )
-                    if poster_url:
-                        update_media_item_poster(db_path, media_item_id, poster_url)
 
                     insert_ranking(
                         db_path,
                         country_code=item['country_code'],
+                        country_name=item.get('country_name'),
                         category=item['category'],
                         rank=item['rank'],
                         week=latest_week,
-                        media_item_id=media_item_id
+                        media_item_id=media_item_id,
+                        weekly_hours_viewed=item['hours'],
+                        weekly_views=item['views'],
+                        cumulative_weeks_in_top_10=item['cumulative_weeks']
                     )
                 current_task += 1
+
 

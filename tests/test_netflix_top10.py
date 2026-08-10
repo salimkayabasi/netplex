@@ -151,10 +151,17 @@ def test_crawl_netflix_top10(mock_fetch, initialized_db):
     assert global_rankings[0]['title'] == "72 HOURS"
     assert global_rankings[0]['release_year'] == 2026 # defaults to current year as year is not in title
     assert global_rankings[0]['type'] == "movie"
+    assert global_rankings[0]['weekly_hours_viewed'] == 44000000
+    assert global_rankings[0]['weekly_views'] == 25100000
+    assert global_rankings[0]['cumulative_weeks_in_top_10'] == 2
+    assert global_rankings[0]['country_name'] == "Global"
 
     ar_tv_rankings = get_active_rankings(initialized_db, "AR", "TV", "2026-08-02")
     assert len(ar_tv_rankings) > 0
+    assert ar_tv_rankings[0]['country_name'] == "Argentina"
+    assert ar_tv_rankings[0]['cumulative_weeks_in_top_10'] is not None
 
     # Ensure rankings for AR Movies are empty since we only monitored 'tv'
     ar_movie_rankings = get_active_rankings(initialized_db, "AR", "Movies", "2026-08-02")
     assert len(ar_movie_rankings) == 0
+

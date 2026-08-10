@@ -40,36 +40,74 @@ def init_db(db_path: str = "/config/netplex.db"):
                 CREATE TABLE IF NOT EXISTS media_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
+                    local_title TEXT,
+                    show_title TEXT,
+                    season_title TEXT,
                     type TEXT NOT NULL CHECK (type IN ('movie', 'tv')),
                     release_year INTEGER NOT NULL,
                     season_name TEXT,
                     folder_name TEXT NOT NULL,
                     file_path TEXT,
                     poster_url TEXT,
+                    logo_url TEXT,
+                    video_url TEXT,
+                    subtitle_url TEXT,
+                    netflix_id INTEGER,
+                    synopsis TEXT,
+                    maturity_rating TEXT,
+                    runtime_seconds INTEGER,
                     status TEXT NOT NULL CHECK (status IN ('pending', 'downloaded', 'failed')),
                     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(title, type, release_year, season_name)
                 )
             """)
-            # Check if poster_url and local_title columns exist for existing DBs
+            # Check for existing DBs and migrate missing columns
             cursor = conn.execute("PRAGMA table_info(media_items)")
             columns = [row['name'] for row in cursor.fetchall()]
-            if 'poster_url' not in columns:
-                conn.execute("ALTER TABLE media_items ADD COLUMN poster_url TEXT")
-            if 'local_title' not in columns:
-                conn.execute("ALTER TABLE media_items ADD COLUMN local_title TEXT")
+            new_media_cols = {
+                'poster_url': 'TEXT',
+                'local_title': 'TEXT',
+                'show_title': 'TEXT',
+                'season_title': 'TEXT',
+                'logo_url': 'TEXT',
+                'video_url': 'TEXT',
+                'subtitle_url': 'TEXT',
+                'netflix_id': 'INTEGER',
+                'synopsis': 'TEXT',
+                'maturity_rating': 'TEXT',
+                'runtime_seconds': 'INTEGER'
+            }
+            for col_name, col_type in new_media_cols.items():
+                if col_name not in columns:
+                    conn.execute(f"ALTER TABLE media_items ADD COLUMN {col_name} {col_type}")
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS rankings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     country_code TEXT NOT NULL,
+                    country_name TEXT,
                     category TEXT NOT NULL CHECK (category IN ('Movies', 'TV')),
                     rank INTEGER NOT NULL CHECK (rank >= 1 AND rank <= 10),
                     week TEXT NOT NULL,
+                    weekly_hours_viewed INTEGER,
+                    weekly_views INTEGER,
+                    cumulative_weeks_in_top_10 INTEGER,
                     media_item_id INTEGER NOT NULL,
                     FOREIGN KEY (media_item_id) REFERENCES media_items(id) ON DELETE CASCADE
                 )
             """)
+            cursor = conn.execute("PRAGMA table_info(rankings)")
+            r_columns = [row['name'] for row in cursor.fetchall()]
+            new_ranking_cols = {
+                'country_name': 'TEXT',
+                'weekly_hours_viewed': 'INTEGER',
+                'weekly_views': 'INTEGER',
+                'cumulative_weeks_in_top_10': 'INTEGER'
+            }
+            for col_name, col_type in new_ranking_cols.items():
+                if col_name not in r_columns:
+                    conn.execute(f"ALTER TABLE rankings ADD COLUMN {col_name} {col_type}")
             
             # Seed default configurations
             defaults = [
@@ -160,7 +198,25 @@ def remove_monitored_country(db_path: str, country_code: str):
     finally:
         conn.close()
 
-def upsert_media_item(db_path: str, title: str, type: str, release_year: int, season_name: str | None, folder_name: str, local_title: str | None = None) -> int:
+def upsert_media_item(
+    db_path: str,
+    title: str,
+    type: str,
+    release_year: int,
+    season_name: str | None,
+    folder_name: str,
+    local_title: str | None = None,
+    netflix_id: int | str | None = None,
+    show_title: str | None = None,
+    season_title: str | None = None,
+    synopsis: str | None = None,
+    maturity_rating: str | None = None,
+    runtime_seconds: int | None = None,
+    logo_url: str | None = None,
+    video_url: str | None = None,
+    subtitle_url: str | None = None,
+    poster_url: str | None = None
+) -> int:
     conn = _get_connection(db_path)
     try:
         with conn:
@@ -169,23 +225,45 @@ def upsert_media_item(db_path: str, title: str, type: str, release_year: int, se
                 (title, type, release_year, season_name)
             )
             row = cursor.fetchone()
+            kwargs = {
+                'local_title': local_title,
+                'netflix_id': int(netflix_id) if netflix_id and str(netflix_id).isdigit() else netflix_id,
+                'show_title': show_title,
+                'season_title': season_title,
+                'synopsis': synopsis,
+                'maturity_rating': maturity_rating,
+                'runtime_seconds': runtime_seconds,
+                'logo_url': logo_url,
+                'video_url': video_url,
+                'subtitle_url': subtitle_url,
+                'poster_url': poster_url
+            }
             if row:
                 media_item_id = row['id']
-                if local_title:
-                    conn.execute(
-                        "UPDATE media_items SET last_seen_at = CURRENT_TIMESTAMP, folder_name = ?, local_title = ? WHERE id = ?",
-                        (folder_name, local_title, media_item_id)
-                    )
-                else:
-                    conn.execute(
-                        "UPDATE media_items SET last_seen_at = CURRENT_TIMESTAMP, folder_name = ? WHERE id = ?",
-                        (folder_name, media_item_id)
-                    )
+                updates = ["last_seen_at = CURRENT_TIMESTAMP", "folder_name = ?"]
+                params = [folder_name]
+                for key, val in kwargs.items():
+                    if val is not None:
+                        updates.append(f"{key} = ?")
+                        params.append(val)
+                params.append(media_item_id)
+                conn.execute(
+                    f"UPDATE media_items SET {', '.join(updates)} WHERE id = ?",
+                    tuple(params)
+                )
                 return media_item_id
             else:
+                fields = ['title', 'type', 'release_year', 'season_name', 'folder_name', 'status']
+                placeholders = ['?', '?', '?', '?', '?', "'pending'"]
+                params = [title, type, release_year, season_name, folder_name]
+                for key, val in kwargs.items():
+                    if val is not None:
+                        fields.append(key)
+                        placeholders.append('?')
+                        params.append(val)
                 cursor = conn.execute(
-                    "INSERT INTO media_items (title, local_title, type, release_year, season_name, folder_name, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
-                    (title, local_title, type, release_year, season_name, folder_name)
+                    f"INSERT INTO media_items ({', '.join(fields)}) VALUES ({', '.join(placeholders)})",
+                    tuple(params)
                 )
                 return cursor.lastrowid
     finally:
@@ -230,6 +308,46 @@ def update_media_item_local_title(db_path: str, item_id: int, local_title: str):
     finally:
         conn.close()
 
+def update_media_item_tudum_metadata(
+    db_path: str,
+    item_id: int,
+    synopsis: str | None = None,
+    video_url: str | None = None,
+    subtitle_url: str | None = None,
+    netflix_id: int | str | None = None,
+    poster_url: str | None = None,
+    logo_url: str | None = None,
+    maturity_rating: str | None = None,
+    runtime_seconds: int | None = None
+):
+    conn = _get_connection(db_path)
+    try:
+        with conn:
+            updates = []
+            params = []
+            kwargs = {
+                'synopsis': synopsis,
+                'video_url': video_url,
+                'subtitle_url': subtitle_url,
+                'netflix_id': int(netflix_id) if netflix_id and str(netflix_id).isdigit() else netflix_id,
+                'poster_url': poster_url,
+                'logo_url': logo_url,
+                'maturity_rating': maturity_rating,
+                'runtime_seconds': runtime_seconds
+            }
+            for key, val in kwargs.items():
+                if val is not None:
+                    updates.append(f"{key} = ?")
+                    params.append(val)
+            if updates:
+                params.append(item_id)
+                conn.execute(
+                    f"UPDATE media_items SET {', '.join(updates)} WHERE id = ?",
+                    tuple(params)
+                )
+    finally:
+        conn.close()
+
 def clear_rankings_for_week(db_path: str, week: str):
     conn = _get_connection(db_path)
     try:
@@ -251,13 +369,32 @@ def clear_rankings_for_country_and_week(db_path: str, country_code: str, week: s
             connection.close()
 
 
-def insert_ranking(db_path: str, country_code: str, category: str, rank: int, week: str, media_item_id: int):
+def insert_ranking(
+    db_path: str,
+    country_code: str,
+    category: str,
+    rank: int,
+    week: str,
+    media_item_id: int,
+    country_name: str | None = None,
+    weekly_hours_viewed: int | None = None,
+    weekly_views: int | None = None,
+    cumulative_weeks_in_top_10: int | None = None
+):
     conn = _get_connection(db_path)
     try:
         with conn:
             conn.execute(
-                "INSERT INTO rankings (country_code, category, rank, week, media_item_id) VALUES (?, ?, ?, ?, ?)",
-                (country_code, category, rank, week, media_item_id)
+                """
+                INSERT INTO rankings (
+                    country_code, country_name, category, rank, week, media_item_id,
+                    weekly_hours_viewed, weekly_views, cumulative_weeks_in_top_10
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    country_code, country_name, category, rank, week, media_item_id,
+                    weekly_hours_viewed, weekly_views, cumulative_weeks_in_top_10
+                )
             )
     finally:
         conn.close()
@@ -267,8 +404,12 @@ def get_active_rankings(db_path: str, country_code: str, category: str, week: st
     try:
         cursor = conn.execute("""
             SELECT 
-                r.id AS ranking_id, r.country_code, r.category, r.rank, r.week,
-                m.id AS media_item_id, m.title, m.local_title, m.type, m.release_year, m.season_name, m.folder_name, m.file_path, m.poster_url, m.status, m.added_at, m.last_seen_at
+                r.id AS ranking_id, r.country_code, r.country_name, r.category, r.rank, r.week,
+                r.weekly_hours_viewed, r.weekly_views, r.cumulative_weeks_in_top_10,
+                m.id AS media_item_id, m.title, m.local_title, m.show_title, m.season_title,
+                m.type, m.release_year, m.season_name, m.folder_name, m.file_path, m.poster_url,
+                m.logo_url, m.video_url, m.subtitle_url, m.netflix_id, m.synopsis, m.maturity_rating,
+                m.runtime_seconds, m.status, m.added_at, m.last_seen_at
             FROM rankings r
             JOIN media_items m ON r.media_item_id = m.id
             WHERE r.country_code = ? AND r.category = ? AND r.week = ?

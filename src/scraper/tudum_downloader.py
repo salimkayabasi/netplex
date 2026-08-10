@@ -8,7 +8,8 @@ from src.database import (
     _get_connection,
     get_setting,
     update_media_item_status,
-    update_media_item_poster
+    update_media_item_poster,
+    update_media_item_tudum_metadata
 )
 from src.crawler_lock import set_crawl_progress
 from src.metadata.nfo_generator import (
@@ -78,8 +79,18 @@ def find_tudum_page(title: str, item_type: str, year: int) -> str | None:
 
 def extract_trailer_assets(tudum_url: str | None) -> dict:
     """Fetches the HTML of the Tudum page, extracts the unescaped graphql models, and locates media assets."""
+    empty_result = {
+        "video_url": None,
+        "subtitle_url": None,
+        "plot": None,
+        "netflix_id": None,
+        "poster_url": None,
+        "logo_url": None,
+        "maturity_rating": None,
+        "runtime_seconds": None
+    }
     if not tudum_url:
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
+        return empty_result
     content = ""
     try:
         req = urllib.request.Request(tudum_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -93,10 +104,10 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
             logger.info(f"Tudum page not found (404) for URL: {tudum_url}")
         else:
             logger.warning(f"HTTP Error {e.code} fetching {tudum_url}")
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
+        return empty_result
     except Exception as e:
         logger.warning(f"Error fetching page {tudum_url}: {e}")
-        return {"video_url": None, "subtitle_url": None, "plot": None, "netflix_id": None, "poster_url": None}
+        return empty_result
         
     # Unescape the graphql models block if present
     match = re.search(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\)", content)
@@ -146,12 +157,40 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     if id_match:
         netflix_id = id_match.group(1)
 
+    # Extract logo url if present
+    logo_url = None
+    logo_match = re.search(r'"logoArt"\s*:\s*\{[^}]*?"url"\s*:\s*"([^"]+)"', content)
+    if logo_match:
+        logo_url = sanitize_url(logo_match.group(1))
+
+    # Extract maturity rating
+    maturity_rating = None
+    mat_match = re.search(r'data-uia="maturity-rating"[^>]*>(.*?)</span>', content, re.DOTALL)
+    if mat_match:
+        maturity_rating = re.sub(r'<[^>]+>', '', mat_match.group(1)).strip()
+    if not maturity_rating:
+        mat_match2 = re.search(r'"maturityRating"\s*:\s*"([^"]+)"', content)
+        if mat_match2:
+            maturity_rating = mat_match2.group(1).strip()
+
+    # Extract runtime seconds
+    runtime_seconds = None
+    rt_match = re.search(r'"runtimeSeconds"\s*:\s*(\d+)', content)
+    if rt_match:
+        try:
+            runtime_seconds = int(rt_match.group(1))
+        except ValueError:
+            runtime_seconds = None
+
     return {
         "video_url": video_url,
         "subtitle_url": subtitle_url,
         "plot": plot,
         "netflix_id": netflix_id,
-        "poster_url": poster_url
+        "poster_url": poster_url,
+        "logo_url": logo_url,
+        "maturity_rating": maturity_rating,
+        "runtime_seconds": runtime_seconds
     }
 
 def download_file(url: str, output_path: str):
@@ -295,8 +334,18 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
             assets = extract_trailer_assets(tudum_url)
             
-            if assets.get("poster_url"):
-                update_media_item_poster(db_path, item['id'], assets["poster_url"])
+            update_media_item_tudum_metadata(
+                db_path,
+                item['id'],
+                synopsis=assets.get("plot"),
+                video_url=assets.get("video_url"),
+                subtitle_url=assets.get("subtitle_url"),
+                netflix_id=assets.get("netflix_id"),
+                poster_url=assets.get("poster_url"),
+                logo_url=assets.get("logo_url"),
+                maturity_rating=assets.get("maturity_rating"),
+                runtime_seconds=assets.get("runtime_seconds")
+            )
 
             if not assets["video_url"]:
                 logger.warning(f"No video URL found for {item['title']}. Marking as failed.")
