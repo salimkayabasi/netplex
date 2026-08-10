@@ -145,5 +145,14 @@ def test_crawl_endpoint_singleton_conflict(client_and_db):
         resp = client.post("/api/crawl")
         assert resp.status_code == 409
         assert "already in progress" in resp.json()["detail"]
+
+        status_resp = client.get("/api/crawl/status")
+        assert status_resp.status_code == 200
+        assert status_resp.json()["is_crawling"] is True
     finally:
         release_crawl_lock()
+
+    status_idle_resp = client.get("/api/crawl/status")
+    assert status_idle_resp.status_code == 200
+    assert status_idle_resp.json()["is_crawling"] is False
+

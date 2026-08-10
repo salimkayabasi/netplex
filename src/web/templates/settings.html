@@ -355,59 +355,5 @@ async function startPlexPinAuth() {
         btn.textContent = "Plex Login (PIN)";
     }
 }
-
-// Manual Crawl Trigger Flow
-async function triggerManualCrawl() {
-    const btn = document.getElementById('btn-trigger-crawl');
-    const badge = document.getElementById('crawl-status-badge');
-    
-    btn.disabled = true;
-    btn.textContent = "⏳ Starting Crawl Job...";
-    badge.textContent = "Status: Initiating pipeline...";
-    badge.style.color = "#f1c40f";
-
-    try {
-        const resp = await fetch('/api/crawl', { method: 'POST' });
-        if (resp.status === 202) {
-            badge.textContent = "Status: Crawl job in progress in background...";
-            badge.style.color = "#2ecc71";
-            btn.textContent = "▶ Crawl Job Running...";
-            pollCrawlStatus();
-        } else if (resp.status === 409) {
-            badge.textContent = "Status: A crawl job is already running!";
-            badge.style.color = "#e67e22";
-            btn.disabled = false;
-            btn.textContent = "▶ Trigger Manual Crawl Job";
-        } else {
-            throw new Error(`Unexpected status code ${resp.status}`);
-        }
-    } catch (err) {
-        badge.textContent = `Status: Error starting crawl - ${err.message}`;
-        badge.style.color = "#e74c3c";
-        btn.disabled = false;
-        btn.textContent = "▶ Trigger Manual Crawl Job";
-    }
-}
-
-async function pollCrawlStatus() {
-    const interval = setInterval(async () => {
-        try {
-            const resp = await fetch('/api/crawl/status');
-            const data = await resp.json();
-            const badge = document.getElementById('crawl-status-badge');
-            const btn = document.getElementById('btn-trigger-crawl');
-
-            if (!data.is_crawling) {
-                clearInterval(interval);
-                badge.textContent = "Status: Crawl job completed (Idle)";
-                badge.style.color = "var(--text-secondary)";
-                btn.disabled = false;
-                btn.textContent = "▶ Trigger Manual Crawl Job";
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }, 3000);
-}
 </script>
 {% endblock %}

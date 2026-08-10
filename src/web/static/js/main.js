@@ -63,44 +63,120 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Trigger Manual Crawl from landing page handler
-    window.triggerManualCrawlFromLanding = async () => {
-        const btn = document.getElementById('btn-landing-crawl');
-        if (!btn) return;
-        btn.disabled = true;
-        btn.textContent = "⏳ Crawling...";
+    // Global Crawl Status Management
+    let crawlPollInterval = null;
+    let wasCrawling = false;
+
+    function updateCrawlStatusUI(isCrawling, statusMessage = null) {
+        const landingBtn = document.getElementById('btn-landing-crawl');
+        if (landingBtn) {
+            if (isCrawling) {
+                landingBtn.disabled = true;
+                landingBtn.textContent = statusMessage || "⏳ Crawling...";
+            } else {
+                landingBtn.disabled = false;
+                landingBtn.textContent = statusMessage || "▶ Trigger Crawl";
+            }
+        }
+
+        const settingsBtn = document.getElementById('btn-trigger-crawl');
+        const settingsBadge = document.getElementById('crawl-status-badge');
+        if (settingsBtn) {
+            if (isCrawling) {
+                settingsBtn.disabled = true;
+                settingsBtn.textContent = "▶ Crawl Job Running...";
+            } else {
+                settingsBtn.disabled = false;
+                settingsBtn.textContent = "▶ Trigger Manual Crawl Job";
+            }
+        }
+        if (settingsBadge) {
+            if (isCrawling) {
+                settingsBadge.textContent = statusMessage || "Status: Crawl job in progress in background...";
+                settingsBadge.style.color = "#f1c40f";
+            } else {
+                settingsBadge.textContent = statusMessage || "Status: Idle";
+                settingsBadge.style.color = "var(--text-secondary)";
+            }
+        }
+    }
+
+    async function checkCrawlStatus() {
+        try {
+            const resp = await fetch('/api/crawl/status');
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (data.is_crawling) {
+                wasCrawling = true;
+                updateCrawlStatusUI(true);
+                startPolling();
+            } else {
+                if (wasCrawling) {
+                    wasCrawling = false;
+                    stopPolling();
+                    updateCrawlStatusUI(false, "✓ Crawl Done!");
+                    if (document.getElementById('btn-landing-crawl')) {
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        setTimeout(() => updateCrawlStatusUI(false), 3000);
+                    }
+                } else {
+                    stopPolling();
+                    updateCrawlStatusUI(false);
+                }
+            }
+        } catch (err) {
+            console.error("Error checking crawl status:", err);
+        }
+    }
+
+    function startPolling() {
+        if (!crawlPollInterval) {
+            crawlPollInterval = setInterval(checkCrawlStatus, 3000);
+        }
+    }
+
+    function stopPolling() {
+        if (crawlPollInterval) {
+            clearInterval(crawlPollInterval);
+            crawlPollInterval = null;
+        }
+    }
+
+    window.triggerManualCrawl = async () => {
+        const landingBtn = document.getElementById('btn-landing-crawl');
+        const settingsBtn = document.getElementById('btn-trigger-crawl');
+        const settingsBadge = document.getElementById('crawl-status-badge');
+
+        if (landingBtn) landingBtn.disabled = true;
+        if (settingsBtn) settingsBtn.disabled = true;
+        if (settingsBadge) {
+            settingsBadge.textContent = "Status: Initiating pipeline...";
+            settingsBadge.style.color = "#f1c40f";
+        }
+
         try {
             const resp = await fetch('/api/crawl', { method: 'POST' });
             if (resp.status === 202) {
-                btn.textContent = "▶ Crawling in progress...";
-                const interval = setInterval(async () => {
-                    try {
-                        const statusResp = await fetch('/api/crawl/status');
-                        const data = await statusResp.json();
-                        if (!data.is_crawling) {
-                            clearInterval(interval);
-                            btn.textContent = "✓ Crawl Done!";
-                            setTimeout(() => window.location.reload(), 1000);
-                        }
-                    } catch (err) {
-                        console.error("Crawl status check error:", err);
-                    }
-                }, 3000);
+                wasCrawling = true;
+                updateCrawlStatusUI(true, "Status: Crawl job in progress in background...");
+                startPolling();
             } else if (resp.status === 409) {
-                btn.textContent = "⚠️ Crawl Active";
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.textContent = "▶ Trigger Crawl";
-                }, 3000);
+                wasCrawling = true;
+                updateCrawlStatusUI(true, "Status: A crawl job is already running!");
+                startPolling();
             } else {
-                throw new Error(`Status ${resp.status}`);
+                throw new Error(`Unexpected status code ${resp.status}`);
             }
         } catch (err) {
-            btn.textContent = "❌ Crawl Failed";
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.textContent = "▶ Trigger Crawl";
-            }, 3000);
+            updateCrawlStatusUI(false, `Status: Error - ${err.message}`);
+            setTimeout(() => updateCrawlStatusUI(false), 3000);
         }
     };
+
+    window.triggerManualCrawlFromLanding = window.triggerManualCrawl;
+
+    // Check crawl status immediately on page load
+    checkCrawlStatus();
 });
