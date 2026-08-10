@@ -1,0 +1,15 @@
+{
+  "id": 12345678,
+  "code": "H9RX",
+  "product": "NetPlex",
+  "trusted": false,
+  "clientIdentifier": "test-client-uuid-1234",
+  "location": {
+    "code": "US",
+    "country": "United States"
+  },
+  "expiresIn": 900,
+  "createdAt": "2026-08-11T00:00:00Z",
+  "expiresAt": "2026-08-11T00:15:00Z",
+  "authToken": null
+}
