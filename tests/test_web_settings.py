@@ -156,3 +156,36 @@ def test_crawl_endpoint_singleton_conflict(client_and_db):
     assert status_idle_resp.status_code == 200
     assert status_idle_resp.json()["is_crawling"] is False
 
+def test_auto_trigger_crawl_on_region_change(client_and_db):
+    client, db_path, _, _ = client_and_db
+    
+    with patch("src.web.routes_settings.run_crawl_pipeline") as mock_pipeline:
+        payload = {
+            "monitored_countries": [
+                {"country_code": "GLOBAL", "formats": "movie,tv"},
+                {"country_code": "TR", "formats": "movie,tv"}
+            ]
+        }
+        resp = client.post("/api/settings", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["crawl_triggered"] is True
+
+def test_crawl_status_task_display(client_and_db):
+    client, _, _, _ = client_and_db
+    from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock, set_crawl_progress
+
+    assert try_acquire_crawl_lock() is True
+    try:
+        set_crawl_progress(3, 14, "Downloading trailer: Are We Happy?")
+        resp = client.get("/api/crawl/status")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["is_crawling"] is True
+        assert data["current_task"] == 3
+        assert data["total_tasks"] == 14
+        assert data["task_display"] == "Crawling (3/14)"
+        assert "Are We Happy?" in data["message"]
+    finally:
+        release_crawl_lock()
+
+
