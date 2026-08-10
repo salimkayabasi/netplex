@@ -1,0 +1,19 @@
+# Workspace / Project Ignore Rules
+
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Cache
+.pytest_cache/
+.cache/
+
+# Local Scratch
+scratch/
