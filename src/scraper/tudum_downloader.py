@@ -146,16 +146,30 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     }
 
 def download_file(url: str, output_path: str):
-    """Stream-downloads the file from the given URL to output_path."""
+    """Downloads the file from the given URL to output_path using yt-dlp."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     clean_url = sanitize_url(url)
-    req = urllib.request.Request(clean_url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=15) as response, open(output_path, 'wb') as out_file:
-        while True:
-            chunk = response.read(16384)
-            if not chunk:
-                break
-            out_file.write(chunk)
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'outtmpl': output_path,
+            'quiet': True,
+            'no_warnings': True,
+            'noprogress': True,
+            'overwrites': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([clean_url])
+    except Exception as e:
+        logger.warning(f"yt-dlp download failed for {clean_url}: {e}, falling back to urllib stream download")
+        req = urllib.request.Request(clean_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as response, open(output_path, 'wb') as out_file:
+            while True:
+                chunk = response.read(16384)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+
 
 def convert_vtt_to_srt(vtt_content: str) -> str:
     """Converts WebVTT formatting timings and cue tags into standard SRT format."""

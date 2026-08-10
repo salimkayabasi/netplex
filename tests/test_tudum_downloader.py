@@ -140,8 +140,22 @@ def test_extract_trailer_assets_failure(mock_urlopen):
     assert assets["video_url"] is None
     assert assets["subtitle_url"] is None
 
+@patch('yt_dlp.YoutubeDL')
+def test_download_file(mock_ytdl_cls, tmp_path):
+    mock_ydl = MagicMock()
+    mock_ytdl_cls.return_value.__enter__.return_value = mock_ydl
+
+    out_file = tmp_path / "trailer.mp4"
+    out_file.write_bytes(b"video_data")
+    download_file("https://example.com/video.mp4", str(out_file))
+
+    mock_ytdl_cls.assert_called_once()
+    mock_ydl.download.assert_called_once_with(["https://example.com/video.mp4"])
+
 @patch('urllib.request.urlopen')
-def test_download_file(mock_urlopen, tmp_path):
+@patch('yt_dlp.YoutubeDL')
+def test_download_file_fallback(mock_ytdl_cls, mock_urlopen, tmp_path):
+    mock_ytdl_cls.side_effect = Exception("yt-dlp error")
     mock_resp = MagicMock()
     mock_resp.read.side_effect = [b"chunk1", b"chunk2", b""]
     mock_urlopen.return_value.__enter__.return_value = mock_resp
@@ -151,6 +165,7 @@ def test_download_file(mock_urlopen, tmp_path):
 
     assert out_file.exists()
     assert out_file.read_bytes() == b"chunk1chunk2"
+
 
 @patch('src.scraper.tudum_downloader.find_tudum_page')
 @patch('src.scraper.tudum_downloader.extract_trailer_assets')
