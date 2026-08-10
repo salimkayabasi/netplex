@@ -132,7 +132,6 @@ COUNTRY_NAMES = {
 @app.get("/", response_class=HTMLResponse)
 def landing_page(
     request: Request,
-    country: Optional[str] = Query(None),
     category: str = Query("Movies")
 ):
     db_path = get_db_path(request)
@@ -156,19 +155,9 @@ def landing_page(
     except Exception:
         pass
 
-    selected_country = country
-    if not selected_country and monitored:
-        selected_country = monitored[0]["country_code"]
-
     # Build country sections in the exact order set from the settings menu
     country_sections = []
-    countries_to_render = monitored
-    if country:
-        matched = [m for m in monitored if m["country_code"] == country]
-        if matched:
-            countries_to_render = matched
-
-    for m in countries_to_render:
+    for m in monitored:
         code = m["country_code"]
         name = COUNTRY_NAMES.get(code, code)
         rankings_for_country = []
@@ -191,7 +180,6 @@ def landing_page(
         name="index.html",
         context={
             "monitored_countries": monitored,
-            "selected_country": selected_country,
             "selected_category": category,
             "current_week": latest_week,
             "rankings": primary_rankings,

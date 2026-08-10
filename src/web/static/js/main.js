@@ -52,17 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Country/Category select change handler
-    const countrySelect = document.getElementById('country-select');
-    if (countrySelect) {
-        countrySelect.addEventListener('change', (e) => {
-            const selectedCountry = e.target.value;
-            const currentUrl = new URL(window.location.href);
-            currentUrl.searchParams.set('country', selectedCountry);
-            window.location.href = currentUrl.toString();
-        });
-    }
-
     // Global Crawl Status Management
     let crawlPollInterval = null;
     let wasCrawling = false;

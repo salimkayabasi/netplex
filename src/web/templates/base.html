@@ -25,15 +25,6 @@
             <a href="/settings" class="tab-btn" style="text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
                 ⚙️ Settings
             </a>
-            {% if monitored_countries %}
-            <select id="country-select" class="filter-select" aria-label="Select Country">
-                {% for c in monitored_countries %}
-                <option value="{{ c.country_code }}" {% if c.country_code == selected_country %}selected{% endif %}>
-                    {{ c.country_code }}
-                </option>
-                {% endfor %}
-            </select>
-            {% endif %}
         </div>
     </header>
 

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}NetPlex - Netflix Top 10{% if selected_country %} ({{ selected_country }}){% endif %}{% endblock %}
+{% block title %}NetPlex - Netflix Top 10{% endblock %}
 
 {% block content %}
 <div class="top-controls-bar">
     <div class="category-toggle-container">
-        <a href="/?{% if selected_country %}country={{ selected_country }}&{% endif %}category=Movies" 
+        <a href="/?category=Movies" 
            class="tab-btn {% if selected_category == 'Movies' %}active{% endif %}">
             Movies
         </a>
-        <a href="/?{% if selected_country %}country={{ selected_country }}&{% endif %}category=TV" 
+        <a href="/?category=TV" 
            class="tab-btn {% if selected_category == 'TV' %}active{% endif %}">
             TV Shows
         </a>
