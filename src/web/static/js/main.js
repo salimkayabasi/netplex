@@ -56,15 +56,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let crawlPollInterval = null;
     let wasCrawling = false;
 
-    function updateCrawlStatusUI(isCrawling, statusMessage = null) {
+    function updateCrawlStatusUI(isCrawling, taskDisplay = null, statusMessage = null) {
+        const displayLabel = taskDisplay || "Crawling...";
+        
         const landingBtn = document.getElementById('btn-landing-crawl');
         if (landingBtn) {
             if (isCrawling) {
                 landingBtn.disabled = true;
-                landingBtn.textContent = statusMessage || "⏳ Crawling...";
+                landingBtn.textContent = `⏳ ${displayLabel}`;
             } else {
                 landingBtn.disabled = false;
-                landingBtn.textContent = statusMessage || "▶ Trigger Crawl";
+                landingBtn.textContent = taskDisplay || "▶ Trigger Crawl";
             }
         }
 
@@ -73,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settingsBtn) {
             if (isCrawling) {
                 settingsBtn.disabled = true;
-                settingsBtn.textContent = "▶ Crawl Job Running...";
+                settingsBtn.textContent = `▶ ${displayLabel}`;
             } else {
                 settingsBtn.disabled = false;
                 settingsBtn.textContent = "▶ Trigger Manual Crawl Job";
@@ -81,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (settingsBadge) {
             if (isCrawling) {
-                settingsBadge.textContent = statusMessage || "Status: Crawl job in progress in background...";
+                settingsBadge.textContent = `Status: ${statusMessage || displayLabel}`;
                 settingsBadge.style.color = "#f1c40f";
             } else {
                 settingsBadge.textContent = statusMessage || "Status: Idle";
@@ -98,13 +100,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.is_crawling) {
                 wasCrawling = true;
-                updateCrawlStatusUI(true);
+                updateCrawlStatusUI(true, data.task_display, data.message);
                 startPolling();
             } else {
                 if (wasCrawling) {
                     wasCrawling = false;
                     stopPolling();
-                    updateCrawlStatusUI(false, "✓ Crawl Done!");
+                    updateCrawlStatusUI(false, "✓ Crawl Done!", "Status: ✓ Crawl Done!");
                     if (document.getElementById('btn-landing-crawl')) {
                         setTimeout(() => window.location.reload(), 1000);
                     } else {
@@ -122,9 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startPolling() {
         if (!crawlPollInterval) {
-            crawlPollInterval = setInterval(checkCrawlStatus, 3000);
+            crawlPollInterval = setInterval(checkCrawlStatus, 1500);
         }
     }
+
 
     function stopPolling() {
         if (crawlPollInterval) {

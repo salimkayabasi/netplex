@@ -26,7 +26,9 @@ from src.cleanup import run_cleanup_cycle
 from src.crawler_lock import (
     try_acquire_crawl_lock,
     release_crawl_lock,
-    is_crawl_in_progress
+    is_crawl_in_progress,
+    set_crawl_progress,
+    get_crawl_status_info
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,49 @@ DEFAULT_DB_PATH = os.environ.get("NETPLEX_DB_PATH", "/config/netplex.db")
 
 def get_db_path(request: Request) -> str:
     return getattr(request.app.state, "db_path", getattr(request.state, "db_path", DEFAULT_DB_PATH))
+
+def run_crawl_pipeline(db_path: str):
+    try:
+        monitored = get_monitored_countries(db_path)
+        ranking_tasks_count = len(monitored)
+        
+        conn = _get_connection(db_path)
+        cursor = conn.execute("SELECT COUNT(*) as count FROM media_items WHERE status = 'pending'")
+        initial_pending = cursor.fetchone()['count']
+        conn.close()
+        
+        total_tasks = ranking_tasks_count + initial_pending
+        set_crawl_progress(1, total_tasks, "Initiating crawl pipeline...")
+
+        crawl_netflix_top10(db_path, current_task_start=1, total_tasks=total_tasks)
+        
+        conn = _get_connection(db_path)
+        cursor = conn.execute("SELECT COUNT(*) as count FROM media_items WHERE status = 'pending'")
+        new_pending = cursor.fetchone()['count']
+        conn.close()
+        
+        total_tasks = ranking_tasks_count + new_pending
+        download_pending_trailers(db_path, current_task_start=ranking_tasks_count + 1, total_tasks=total_tasks)
+
+        conn = _get_connection(db_path)
+        cursor = conn.execute("SELECT week FROM rankings ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        latest_week = row["week"] if row else None
+        conn.close()
+
+        if latest_week:
+            try:
+                run_plex_sync(db_path, latest_week)
+            except Exception as e:
+                logger.error(f"Plex sync error during crawl: {e}")
+            try:
+                run_cleanup_cycle(db_path, latest_week)
+            except Exception as e:
+                logger.error(f"Cleanup cycle error during crawl: {e}")
+    except Exception as e:
+        logger.error(f"Crawl pipeline error: {e}")
+    finally:
+        release_crawl_lock()
 
 async def parse_form_data(request: Request) -> dict[str, list[str]]:
     try:
@@ -105,7 +150,7 @@ def get_settings_page(request: Request):
 
 @router.post("/settings")
 @router.post("/api/settings")
-async def save_settings(request: Request):
+async def save_settings(request: Request, background_tasks: BackgroundTasks):
     db_path = get_db_path(request)
     content_type = request.headers.get("content-type", "")
     
@@ -154,11 +199,12 @@ async def save_settings(request: Request):
     if log_level is not None:
         set_setting(db_path, "log_level", str(log_level))
 
+    region_changed = False
     if monitored_countries is not None:
         existing = get_monitored_countries(db_path)
-        for item in existing:
-            remove_monitored_country(db_path, item["country_code"])
-            
+        existing_map = {item["country_code"].upper(): item.get("formats", "movie,tv") for item in existing}
+        
+        new_map = {}
         for item in monitored_countries:
             if isinstance(item, dict):
                 code = item.get("country_code")
@@ -167,10 +213,23 @@ async def save_settings(request: Request):
                 code = str(item)
                 formats = "movie,tv"
             if code:
-                set_monitored_country(db_path, code.upper(), formats)
+                new_map[code.upper()] = formats
+
+        if existing_map != new_map:
+            region_changed = True
+            for item in existing:
+                remove_monitored_country(db_path, item["country_code"])
+                
+            for code, formats in new_map.items():
+                set_monitored_country(db_path, code, formats)
+
+    # Auto-trigger crawler if region configuration has changed and no crawler is running
+    if region_changed and not is_crawl_in_progress():
+        if try_acquire_crawl_lock():
+            background_tasks.add_task(run_crawl_pipeline, db_path)
 
     if "application/json" in content_type:
-        return JSONResponse({"status": "success", "message": "Settings updated successfully"})
+        return JSONResponse({"status": "success", "message": "Settings updated successfully", "crawl_triggered": region_changed})
     else:
         return RedirectResponse(url="/settings?success=1", status_code=303)
 
@@ -198,35 +257,10 @@ def trigger_manual_crawl(request: Request, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=409, detail="A crawl job is already in progress")
 
     db_path = get_db_path(request)
-
-    def task_wrapper():
-        try:
-            crawl_netflix_top10(db_path)
-            download_pending_trailers(db_path)
-            
-            conn = _get_connection(db_path)
-            cursor = conn.execute("SELECT week FROM rankings ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            latest_week = row["week"] if row else None
-            conn.close()
-            
-            if latest_week:
-                try:
-                    run_plex_sync(db_path, latest_week)
-                except Exception as e:
-                    logger.error(f"Plex sync error during manual crawl: {e}")
-                try:
-                    run_cleanup_cycle(db_path, latest_week)
-                except Exception as e:
-                    logger.error(f"Cleanup cycle error during manual crawl: {e}")
-        except Exception as e:
-            logger.error(f"Manual crawl pipeline error: {e}")
-        finally:
-            release_crawl_lock()
-
-    background_tasks.add_task(task_wrapper)
+    background_tasks.add_task(run_crawl_pipeline, db_path)
     return JSONResponse(status_code=202, content={"status": "accepted", "message": "Crawl pipeline initiated"})
 
 @router.get("/api/crawl/status")
 def get_crawl_status():
-    return JSONResponse({"is_crawling": is_crawl_in_progress()})
+    return JSONResponse(get_crawl_status_info())
+

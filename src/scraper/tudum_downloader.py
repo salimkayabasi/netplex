@@ -10,6 +10,7 @@ from src.database import (
     update_media_item_status,
     update_media_item_poster
 )
+from src.crawler_lock import set_crawl_progress
 from src.metadata.nfo_generator import (
     generate_nfo_xml,
     write_nfo_file
@@ -267,7 +268,7 @@ def extract_season_number(season_name: str | None) -> str:
             
     return "01"
 
-def download_pending_trailers(db_path: str, media_dir: str = None):
+def download_pending_trailers(db_path: str, media_dir: str = None, current_task_start: int = 1, total_tasks: int = 0):
     """Fetches all pending media items from the database and downloads their trailers/subtitles."""
     if media_dir is None:
         media_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
@@ -285,8 +286,11 @@ def download_pending_trailers(db_path: str, media_dir: str = None):
     subtitle_languages_str = get_setting(db_path, "subtitle_languages", "en")
     subtitle_langs = [lang.strip() for lang in subtitle_languages_str.split(",") if lang.strip()]
     
-    for item in items:
+    for idx, item in enumerate(items):
+        current_task = current_task_start + idx
+        set_crawl_progress(current_task, total_tasks, f"Downloading trailer: {item['title']}")
         logger.info(f"Processing trailer download for: {item['title']}")
+
         try:
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
             assets = extract_trailer_assets(tudum_url)

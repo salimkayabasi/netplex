@@ -238,6 +238,19 @@ def clear_rankings_for_week(db_path: str, week: str):
     finally:
         conn.close()
 
+def clear_rankings_for_country_and_week(db_path: str, country_code: str, week: str, conn: sqlite3.Connection | None = None):
+    """Deletes rankings specifically for the given country_code and week."""
+    if conn is not None:
+        conn.execute("DELETE FROM rankings WHERE country_code = ? AND week = ?", (country_code.upper(), week))
+    else:
+        connection = _get_connection(db_path)
+        try:
+            with connection:
+                connection.execute("DELETE FROM rankings WHERE country_code = ? AND week = ?", (country_code.upper(), week))
+        finally:
+            connection.close()
+
+
 def insert_ranking(db_path: str, country_code: str, category: str, rank: int, week: str, media_item_id: int):
     conn = _get_connection(db_path)
     try:
