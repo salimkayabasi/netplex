@@ -3,21 +3,19 @@
 {% block title %}NetPlex Settings & Control Panel{% endblock %}
 
 {% block content %}
-<div class="section-header" style="margin-bottom: 1.5rem;">
-    <h1 class="section-title">
-        ⚙️ Settings & Control Panel
-    </h1>
-    <p class="section-subtitle">
-        Manage monitored regions, Plex server integration, subtitle downloads, and background operations.
-    </p>
+<div class="section-header" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 class="section-title">
+            ⚙️ Settings & Control Panel
+        </h1>
+        <p class="section-subtitle">
+            Manage monitored regions, Plex server integration, subtitle downloads, and background operations.
+        </p>
+    </div>
+    <div id="auto-save-badge" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); opacity: 0; transition: opacity 0.3s ease;">
+        ✓ Saved automatically
+    </div>
 </div>
-
-{% if success %}
-<div id="success-alert" style="background-color: rgba(46, 204, 113, 0.2); border: 1px solid #2ecc71; color: #2ecc71; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between;">
-    <span>✓ Settings successfully saved and updated in database!</span>
-    <button type="button" onclick="document.getElementById('success-alert').remove()" style="background: none; border: none; color: #2ecc71; cursor: pointer; font-size: 1.2rem;">&times;</button>
-</div>
-{% endif %}
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-bottom: 2.5rem;">
 
@@ -28,7 +26,7 @@
                 🎬 Plex Server Integration
             </h2>
             
-            <form id="plex-form" action="/settings" method="POST">
+            <form id="plex-form" onsubmit="event.preventDefault(); return false;">
                 <div style="margin-bottom: 1.25rem;">
                     <label for="plex_url" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
                         Plex Server URL
@@ -63,7 +61,7 @@
             ⏱️ Sync & Subtitle Preferences
         </h2>
         
-        <form id="preferences-form" action="/settings" method="POST">
+        <form id="preferences-form" onsubmit="event.preventDefault(); return false;">
             <div style="margin-bottom: 1rem;">
                 <label for="update_interval_hours" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
                     Update Interval (Hours)
@@ -129,100 +127,84 @@
 
 <!-- Full-width Section: Monitored Countries Form -->
 <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.75rem; margin-bottom: 2.5rem;">
-    <form id="main-settings-form" action="/settings" method="POST">
-        <!-- Hidden mirror inputs for other cards -->
-        <input type="hidden" name="plex_url" id="hidden_plex_url">
-        <input type="hidden" name="plex_token" id="hidden_plex_token">
-        <input type="hidden" name="update_interval_hours" id="hidden_update_interval_hours">
-        <input type="hidden" name="subtitle_languages" id="hidden_subtitle_languages">
-        <input type="hidden" name="trailer_subtitles" id="hidden_trailer_subtitles">
-        <input type="hidden" name="log_level" id="hidden_log_level">
+    <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
+            🌍 Monitored Regions & Content Formats
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary);">
+            Select a Netflix Top 10 country from the dropdown, choose content formats, and click Add. Changes save automatically.
+        </p>
+    </div>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-            <div>
-                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
-                    🌍 Monitored Regions & Content Formats
-                </h2>
-                <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                    Select a Netflix Top 10 country from the dropdown, choose content formats, and click Add.
-                </p>
-            </div>
-            
-            <button type="submit" onclick="syncHiddenFields()"
-                    style="background-color: var(--netflix-red); color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 1rem;">
-                💾 Save All Settings
-            </button>
+    <!-- Add Region Control Bar -->
+    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem;">
+        <div style="flex: 1; min-width: 220px;">
+            <label for="add-country-select" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                Select Country / Region
+            </label>
+            <select id="add-country-select" style="width: 100%; background: #141414; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                {% for c in available_countries %}
+                <option value="{{ c.code }}">{{ c.name }} ({{ c.code }})</option>
+                {% endfor %}
+            </select>
         </div>
 
-        <!-- Add Region Control Bar -->
-        <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem;">
-            <div style="flex: 1; min-width: 220px;">
-                <label for="add-country-select" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
-                    Select Country / Region
+        <div style="min-width: 200px;">
+            <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                Content Formats
+            </label>
+            <div style="display: flex; gap: 1rem; align-items: center; height: 38px;">
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
+                    <input type="checkbox" id="add-format-movie" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+                    Movies
                 </label>
-                <select id="add-country-select" style="width: 100%; background: #141414; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
-                    {% for c in available_countries %}
-                    <option value="{{ c.code }}">{{ c.name }} ({{ c.code }})</option>
-                    {% endfor %}
-                </select>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
+                    <input type="checkbox" id="add-format-tv" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+                    TV Shows
+                </label>
             </div>
+        </div>
 
-            <div style="min-width: 200px;">
-                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
-                    Content Formats
-                </label>
-                <div style="display: flex; gap: 1rem; align-items: center; height: 38px;">
-                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
-                        <input type="checkbox" id="add-format-movie" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+        <div style="align-self: flex-end;">
+            <button type="button" onclick="addMonitoredRegion()"
+                    style="background-color: #27ae60; color: #fff; border: none; padding: 0.65rem 1.25rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
+                ➕ Add Region
+            </button>
+        </div>
+    </div>
+
+    <!-- Monitored Regions List Container -->
+    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.75rem;">
+        Currently Monitored Regions
+    </h3>
+    <div id="monitored-regions-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+        {% for item in monitored_countries %}
+        {% set c_code = item.country_code.upper() %}
+        {% set fmt = item.formats %}
+        <div id="region-card-{{ c_code }}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <input type="hidden" name="country_code" value="{{ c_code }}">
+            <div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+                    {% set country_obj = available_countries | selectattr('code', 'equalto', c_code) | first %}
+                    {% if country_obj %}{{ country_obj.name }} ({{ c_code }}){% else %}{{ c_code }}{% endif %}
+                </div>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                        <input type="checkbox" name="format_movie_{{ c_code }}" value="movie" {% if 'movie' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
                         Movies
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
-                        <input type="checkbox" id="add-format-tv" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
+                        <input type="checkbox" name="format_tv_{{ c_code }}" value="tv" {% if 'tv' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
                         TV Shows
                     </label>
                 </div>
             </div>
-
-            <div style="align-self: flex-end;">
-                <button type="button" onclick="addMonitoredRegion()"
-                        style="background-color: #27ae60; color: #fff; border: none; padding: 0.65rem 1.25rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
-                    ➕ Add Region
-                </button>
-            </div>
+            <button type="button" onclick="removeMonitoredRegion('{{ c_code }}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+                🗑️ Remove
+            </button>
         </div>
-
-        <!-- Monitored Regions List Container -->
-        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.75rem;">
-            Currently Monitored Regions
-        </h3>
-        <div id="monitored-regions-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-            {% for item in monitored_countries %}
-            {% set c_code = item.country_code.upper() %}
-            {% set fmt = item.formats %}
-            <div id="region-card-{{ c_code }}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                <input type="hidden" name="country_code" value="{{ c_code }}">
-                <div>
-                    <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
-                        {{ c_code }}
-                    </div>
-                    <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
-                        <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                            <input type="checkbox" name="format_movie_{{ c_code }}" value="movie" {% if 'movie' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
-                            Movies
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                            <input type="checkbox" name="format_tv_{{ c_code }}" value="tv" {% if 'tv' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
-                            TV Shows
-                        </label>
-                    </div>
-                </div>
-                <button type="button" onclick="removeMonitoredRegion('{{ c_code }}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
-                    🗑️ Remove
-                </button>
-            </div>
-            {% endfor %}
-        </div>
-    </form>
+        {% endfor %}
+    </div>
 </div>
 
 <script>
@@ -231,6 +213,118 @@ const availableCountriesMap = {
     "{{ c.code }}": "{{ c.name }}",
     {% endfor %}
 };
+
+let autoSaveTimeout = null;
+
+function showAutoSaveBadge(state, message) {
+    const badge = document.getElementById('auto-save-badge');
+    if (!badge) return;
+    
+    if (state === 'saving') {
+        badge.style.backgroundColor = 'rgba(241, 196, 15, 0.15)';
+        badge.style.borderColor = 'rgba(241, 196, 15, 0.3)';
+        badge.style.color = '#f1c40f';
+        badge.innerHTML = '⏳ Saving changes...';
+        badge.style.opacity = '1';
+    } else if (state === 'saved') {
+        badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
+        badge.style.borderColor = 'rgba(46, 204, 113, 0.3)';
+        badge.style.color = '#2ecc71';
+        badge.innerHTML = message || '✓ Saved automatically';
+        badge.style.opacity = '1';
+        
+        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(() => {
+            badge.style.opacity = '0';
+        }, 3000);
+    } else if (state === 'error') {
+        badge.style.backgroundColor = 'rgba(231, 76, 60, 0.15)';
+        badge.style.borderColor = 'rgba(231, 76, 60, 0.3)';
+        badge.style.color = '#e74c3c';
+        badge.innerHTML = message || '❌ Error saving settings';
+        badge.style.opacity = '1';
+    }
+}
+
+async function autoSaveSettings(payload) {
+    showAutoSaveBadge('saving');
+    try {
+        const resp = await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        if (resp.ok) {
+            showAutoSaveBadge('saved');
+        } else {
+            showAutoSaveBadge('error', '❌ Failed to save settings');
+        }
+    } catch (err) {
+        console.error("Auto-save error:", err);
+        showAutoSaveBadge('error', '❌ Connection error while saving');
+    }
+}
+
+function getMonitoredRegionsData() {
+    const list = document.getElementById('monitored-regions-list');
+    const cards = list.querySelectorAll('.region-card');
+    const regions = [];
+    cards.forEach(card => {
+        const inputHidden = card.querySelector('input[name="country_code"]');
+        if (!inputHidden) return;
+        const code = inputHidden.value;
+        const movieChk = card.querySelector(`input[name="format_movie_${code}"]`);
+        const tvChk = card.querySelector(`input[name="format_tv_${code}"]`);
+        const movieChecked = movieChk ? movieChk.checked : false;
+        const tvChecked = tvChk ? tvChk.checked : false;
+        
+        let formats = [];
+        if (movieChecked) formats.push("movie");
+        if (tvChecked) formats.push("tv");
+        
+        regions.push({
+            country_code: code,
+            formats: formats.join(",")
+        });
+    });
+    return regions;
+}
+
+function saveMonitoredRegions() {
+    const regions = getMonitoredRegionsData();
+    autoSaveSettings({ monitored_countries: regions });
+}
+
+function createDebouncedSaver(saveFn, delay = 500) {
+    let timer = null;
+    return function() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+            saveFn();
+        }, delay);
+    };
+}
+
+const savePlexDebounced = createDebouncedSaver(() => {
+    const plex_url = document.getElementById('plex_url').value;
+    const plex_token = document.getElementById('plex_token').value;
+    autoSaveSettings({ plex_url, plex_token });
+});
+
+const savePrefsDebounced = createDebouncedSaver(() => {
+    const update_interval_hours = document.getElementById('update_interval_hours').value;
+    const subtitle_languages = document.getElementById('subtitle_languages').value;
+    const trailer_subtitles = document.getElementById('trailer_subtitles').checked;
+    const log_level = document.getElementById('log_level').value;
+    autoSaveSettings({
+        update_interval_hours,
+        subtitle_languages,
+        trailer_subtitles,
+        log_level
+    });
+});
 
 function addMonitoredRegion() {
     const code = document.getElementById('add-country-select').value;
@@ -250,6 +344,7 @@ function addMonitoredRegion() {
         const tvChk = existingCard.querySelector(`input[name="format_tv_${code}"]`);
         if (movieChk) movieChk.checked = movieChecked;
         if (tvChk) tvChk.checked = tvChecked;
+        saveMonitoredRegions();
         return;
     }
 
@@ -279,22 +374,15 @@ function addMonitoredRegion() {
     `;
 
     container.insertAdjacentHTML('beforeend', cardHtml);
+    saveMonitoredRegions();
 }
 
 function removeMonitoredRegion(code) {
     const card = document.getElementById(`region-card-${code}`);
     if (card) {
         card.remove();
+        saveMonitoredRegions();
     }
-}
-
-function syncHiddenFields() {
-    document.getElementById('hidden_plex_url').value = document.getElementById('plex_url').value;
-    document.getElementById('hidden_plex_token').value = document.getElementById('plex_token').value;
-    document.getElementById('hidden_update_interval_hours').value = document.getElementById('update_interval_hours').value;
-    document.getElementById('hidden_subtitle_languages').value = document.getElementById('subtitle_languages').value;
-    document.getElementById('hidden_trailer_subtitles').value = document.getElementById('trailer_subtitles').checked ? 'true' : 'false';
-    document.getElementById('hidden_log_level').value = document.getElementById('log_level').value;
 }
 
 // Plex PIN Auth Flow
@@ -339,6 +427,7 @@ async function startPlexPinAuth() {
                     statusText.style.color = "#2ecc71";
                     btn.disabled = false;
                     btn.textContent = "Plex Login (PIN)";
+                    autoSaveSettings({ plex_token: statusData.token });
                     if (popup && !popup.closed) {
                         popup.close();
                     }
@@ -355,5 +444,59 @@ async function startPlexPinAuth() {
         btn.textContent = "Plex Login (PIN)";
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Plex inputs
+    const plexUrlEl = document.getElementById('plex_url');
+    const plexTokenEl = document.getElementById('plex_token');
+    if (plexUrlEl) {
+        plexUrlEl.addEventListener('input', savePlexDebounced);
+        plexUrlEl.addEventListener('change', () => autoSaveSettings({ plex_url: plexUrlEl.value, plex_token: plexTokenEl.value }));
+    }
+    if (plexTokenEl) {
+        plexTokenEl.addEventListener('input', savePlexDebounced);
+        plexTokenEl.addEventListener('change', () => autoSaveSettings({ plex_url: plexUrlEl.value, plex_token: plexTokenEl.value }));
+    }
+
+    // Preferences inputs
+    const intervalEl = document.getElementById('update_interval_hours');
+    const subLangEl = document.getElementById('subtitle_languages');
+    const trailerSubEl = document.getElementById('trailer_subtitles');
+    const logLevelEl = document.getElementById('log_level');
+
+    const triggerPrefsSave = () => {
+        autoSaveSettings({
+            update_interval_hours: intervalEl ? intervalEl.value : "168",
+            subtitle_languages: subLangEl ? subLangEl.value : "en",
+            trailer_subtitles: trailerSubEl ? trailerSubEl.checked : false,
+            log_level: logLevelEl ? logLevelEl.value : "INFO"
+        });
+    };
+
+    if (intervalEl) {
+        intervalEl.addEventListener('input', savePrefsDebounced);
+        intervalEl.addEventListener('change', triggerPrefsSave);
+    }
+    if (subLangEl) {
+        subLangEl.addEventListener('input', savePrefsDebounced);
+        subLangEl.addEventListener('change', triggerPrefsSave);
+    }
+    if (trailerSubEl) {
+        trailerSubEl.addEventListener('change', triggerPrefsSave);
+    }
+    if (logLevelEl) {
+        logLevelEl.addEventListener('change', triggerPrefsSave);
+    }
+
+    // Delegated listener for region checkboxes
+    const regionListEl = document.getElementById('monitored-regions-list');
+    if (regionListEl) {
+        regionListEl.addEventListener('change', (e) => {
+            if (e.target && e.target.type === 'checkbox') {
+                saveMonitoredRegions();
+            }
+        });
+    }
+});
 </script>
 {% endblock %}
