@@ -267,3 +267,50 @@ def test_download_pending_trailers_failure(mock_download, mock_extract, mock_fin
     conn.close()
 
     assert status == "failed"
+
+@patch('src.scraper.tudum_downloader.find_tudum_page')
+@patch('src.scraper.tudum_downloader.extract_trailer_assets')
+@patch('src.scraper.tudum_downloader.download_file')
+def test_download_pending_trailers_dummy_mode(mock_download, mock_extract, mock_find, initialized_db, tmp_path):
+    set_setting(initialized_db, "dummy_media_mode", "true")
+    conn = _get_connection(initialized_db)
+    with conn:
+        conn.execute("""
+            INSERT INTO media_items (title, type, release_year, season_name, folder_name, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, ("Dummy Movie", "movie", 2026, None, "Dummy Movie (2026)", "pending"))
+
+    mock_find.return_value = "https://www.netflix.com/tudum/dummy"
+    mock_extract.return_value = {
+        "video_url": "https://example.com/dummy.mp4",
+        "subtitle_url": None,
+        "plot": "Dummy Plot",
+        "netflix_id": "999",
+        "poster_url": None,
+        "logo_url": None,
+        "maturity_rating": None,
+        "runtime_seconds": None
+    }
+
+    media_dir = tmp_path / "media"
+    download_pending_trailers(initialized_db, media_dir=str(media_dir))
+
+    # download_file should not be called in dummy mode
+    mock_download.assert_not_called()
+
+    # Zero-byte stub file should exist
+    stub_file = media_dir / "movies" / "Dummy Movie (2026)" / "Dummy Movie (2026).mp4"
+    assert stub_file.exists()
+    assert stub_file.stat().st_size == 0
+
+    # NFO should exist
+    nfo_file = media_dir / "movies" / "Dummy Movie (2026)" / "movie.nfo"
+    assert nfo_file.exists()
+
+    # DB status should be downloaded
+    conn = _get_connection(initialized_db)
+    cursor = conn.execute("SELECT status, file_path FROM media_items WHERE title = 'Dummy Movie'")
+    row = cursor.fetchone()
+    conn.close()
+    assert row["status"] == "downloaded"
+    assert row["file_path"] == str(stub_file)

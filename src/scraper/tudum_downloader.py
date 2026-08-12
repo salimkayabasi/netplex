@@ -321,7 +321,8 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
     if not items:
         return
         
-    trailer_subtitles = get_setting(db_path, "trailer_subtitles", "false") == "true"
+    dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    trailer_subtitles = get_setting(db_path, "trailer_subtitles", "false").lower() in ("true", "1", "yes", "on")
     subtitle_languages_str = get_setting(db_path, "subtitle_languages", "en")
     subtitle_langs = [lang.strip() for lang in subtitle_languages_str.split(",") if lang.strip()]
     
@@ -330,7 +331,6 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
         current_task = idx + 1
         set_crawl_progress(current_task, total_count, f"Downloading trailer: {item['title']}")
         logger.info(f"Processing trailer download for: {item['title']}")
-
 
         try:
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
@@ -349,18 +349,18 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 runtime_seconds=assets.get("runtime_seconds")
             )
 
-            if not assets["video_url"]:
+            if not assets["video_url"] and not dummy_media_mode:
                 logger.warning(f"No video URL found for {item['title']}. Marking as failed.")
                 update_media_item_status(db_path, item['id'], 'failed')
                 continue
                 
             # Determine directory layout
             folder_name = item['folder_name']
+            v_url = assets.get("video_url") or ""
+            ext = ".mkv" if ".mkv" in v_url else ".mp4"
             
             if item['type'] == 'movie':
                 target_dir = os.path.join(media_dir, "movies", folder_name)
-                # Keep original extension or fallback to .mp4
-                ext = ".mkv" if ".mkv" in assets["video_url"] else ".mp4"
                 video_filename = f"{folder_name}{ext}"
                 video_path = os.path.join(target_dir, video_filename)
                 
@@ -370,7 +370,6 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
             else:
                 season_padded = extract_season_number(item['season_name'])
                 target_dir = os.path.join(media_dir, "tv", folder_name, f"Season {season_padded}")
-                ext = ".mkv" if ".mkv" in assets["video_url"] else ".mp4"
                 video_filename = f"S{season_padded}E00 - Trailer{ext}"
                 video_path = os.path.join(target_dir, video_filename)
                 
@@ -380,8 +379,12 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 
             os.makedirs(target_dir, exist_ok=True)
                 
-            # Download Video
-            download_file(assets["video_url"], video_path)
+            # Download or create dummy video stub
+            if dummy_media_mode:
+                logger.info(f"Dummy media mode: Creating zero-byte trailer stub for {item['title']} at {video_path}")
+                open(video_path, 'wb').close()
+            else:
+                download_file(assets["video_url"], video_path)
             
             # Download Subtitle if enabled
             if trailer_subtitles and assets["subtitle_url"]:
