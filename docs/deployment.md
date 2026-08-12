@@ -53,6 +53,7 @@ NetPlex can be executed directly on your host machine using **Python** (ideal fo
      ```bash
      NETPLEX_DB_PATH=./config/netplex.db \
      NETPLEX_CONFIG_DIR=./config \
+     NETPLEX_CACHE_DIR=./config/cache \
      NETPLEX_DATA_DIR=./media \
      NETPLEX_HOST=127.0.0.1 \
      NETPLEX_PORT=8000 \
@@ -63,6 +64,7 @@ NetPlex can be executed directly on your host machine using **Python** (ideal fo
      ```powershell
      $env:NETPLEX_DB_PATH="./config/netplex.db"
      $env:NETPLEX_CONFIG_DIR="./config"
+     $env:NETPLEX_CACHE_DIR="./config/cache"
      $env:NETPLEX_DATA_DIR="./media"
      $env:NETPLEX_HOST="127.0.0.1"
      $env:NETPLEX_PORT="8000"
@@ -105,6 +107,7 @@ services:
     environment:
       - NETPLEX_DB_PATH=/config/netplex.db
       - NETPLEX_CONFIG_DIR=/config
+      - NETPLEX_CACHE_DIR=/config/cache
       - NETPLEX_DATA_DIR=/data
       - NETPLEX_HOST=0.0.0.0
       - NETPLEX_PORT=8000
@@ -139,6 +142,7 @@ services:
      -v $(pwd)/.docker/data:/data \
      -e NETPLEX_DB_PATH=/config/netplex.db \
      -e NETPLEX_CONFIG_DIR=/config \
+     -e NETPLEX_CACHE_DIR=/config/cache \
      -e NETPLEX_DATA_DIR=/data \
      netplex:latest
    ```
@@ -155,7 +159,8 @@ services:
 | Variable | Description | Default (Docker) | Default (Local Python) |
 | :--- | :--- | :--- | :--- |
 | `NETPLEX_DB_PATH` | Path to SQLite database file | `/config/netplex.db` | `./config/netplex.db` |
-| `NETPLEX_CONFIG_DIR` | Path to configuration & cache folder | `/config` | `./config` |
+| `NETPLEX_CONFIG_DIR` | Path to configuration & logs folder | `/config` | `./config` |
+| `NETPLEX_CACHE_DIR` | Path to temporary TSV cache folder | `/config/cache` | `./config/cache` |
 | `NETPLEX_DATA_DIR` | Path to downloaded media files (`movies/` & `tv/`) | `/data` | `./media` or `./data` |
 | `NETPLEX_HOST` | Web server bind IP address | `0.0.0.0` | `0.0.0.0` or `127.0.0.1` |
 | `NETPLEX_PORT` | Web server listening port | `8000` | `8000` |

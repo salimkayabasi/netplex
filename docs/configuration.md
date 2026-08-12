@@ -4,6 +4,22 @@ NetPlex avoids complex environment variables or messy configuration files. All u
 
 ---
 
+## ⚙️ Environment Variables
+
+The container / application behavior can be customized using the following environment variables:
+
+| Environment Variable | Description | Default Value |
+| :--- | :--- | :--- |
+| `NETPLEX_DB_PATH` | Path to SQLite database file | `/config/netplex.db` |
+| `NETPLEX_CONFIG_DIR` | Directory for logs and static assets | `/config` |
+| `NETPLEX_CACHE_DIR` | Directory for temporary TSV downloads | `/config/cache` |
+| `NETPLEX_DATA_DIR` | Target media directory for Plex libraries | `/data` |
+| `NETPLEX_HOST` | Web application server bind IP | `0.0.0.0` |
+| `NETPLEX_PORT` | Web application server port | `8000` |
+| `NETPLEX_LOG_LEVEL` | Application logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
+
+---
+
 ## 🖥️ Web UI Settings Menu
 
 When the Docker container is running, access the dashboard at `http://localhost:8000`. 

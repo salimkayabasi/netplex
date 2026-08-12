@@ -385,6 +385,18 @@ def cleanup_tsv_cache(cache_dir: str):
             except OSError as e:
                 logger.warning(f"Failed to remove cached file {file_path}: {e}")
 
+def get_cache_dir(db_path: str) -> str:
+    """Resolves the cache directory from NETPLEX_CACHE_DIR environment variable or fallback paths."""
+    env_cache = os.environ.get("NETPLEX_CACHE_DIR")
+    if env_cache and env_cache.strip():
+        return env_cache.strip()
+    if db_path == ":memory:":
+        return "cache"
+    config_dir = os.environ.get("NETPLEX_CONFIG_DIR")
+    if config_dir:
+        return os.path.join(config_dir, "cache")
+    return os.path.join(os.path.dirname(os.path.abspath(db_path)), 'cache')
+
 def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: int = 0):
     """Crawl, parse, and synchronize NetPlex rankings with Netflix Top 10 portal."""
     start_time = time.time()
@@ -395,12 +407,7 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
     if not countries_config:
         return
         
-    # Resolve cache directory relative to database path (not managed by env file)
-    if db_path == ":memory:":
-        cache_dir = "cache"
-    else:
-        cache_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), 'cache')
-        
+    cache_dir = get_cache_dir(db_path)
     os.makedirs(cache_dir, exist_ok=True)
 
     # On start of crawl, delete pre-existing TSV files first

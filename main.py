@@ -16,6 +16,7 @@ async def run_server(host: str, port: int):
 async def main():
     db_path = os.environ.get("NETPLEX_DB_PATH", "/config/netplex.db")
     config_dir = os.environ.get("NETPLEX_CONFIG_DIR", "/config")
+    cache_dir = os.environ.get("NETPLEX_CACHE_DIR", os.path.join(config_dir, "cache"))
     host = os.environ.get("NETPLEX_HOST", "0.0.0.0")
     port = int(os.environ.get("NETPLEX_PORT", "8000"))
     log_level = os.environ.get("NETPLEX_LOG_LEVEL", "INFO")

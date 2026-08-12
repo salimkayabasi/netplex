@@ -10,6 +10,7 @@ services:
     environment:
       - NETPLEX_DB_PATH=/config/netplex.db
       - NETPLEX_CONFIG_DIR=/config
+      - NETPLEX_CACHE_DIR=/config/cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s

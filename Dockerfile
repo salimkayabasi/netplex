@@ -24,6 +24,7 @@ VOLUME ["/config", "/data"]
 # Define environment variables with defaults
 ENV NETPLEX_DB_PATH=/config/netplex.db \
     NETPLEX_CONFIG_DIR=/config \
+    NETPLEX_CACHE_DIR=/config/cache \
     PYTHONUNBUFFERED=1
 
 CMD ["python", "main.py"]
