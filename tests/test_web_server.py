@@ -120,13 +120,18 @@ def test_download_and_cache_tudum_css(test_env):
         saved_css = f.read()
     assert "--tudum-brand-red" in saved_css
 
-def test_stream_video_endpoint(test_env):
+def test_stream_video_endpoint(test_env, monkeypatch):
     client = test_env["client"]
     db_path = test_env["db_path"]
     tmpdir = test_env["tmpdir"]
 
-    # Create dummy 1024-byte video file
-    video_file_path = os.path.join(tmpdir, "sample_trailer.mp4")
+    # Configure data dir to tmpdir
+    data_dir = os.path.join(tmpdir, "media")
+    os.makedirs(data_dir, exist_ok=True)
+    monkeypatch.setenv("NETPLEX_DATA_DIR", data_dir)
+
+    # Create dummy 1024-byte video file inside data_dir
+    video_file_path = os.path.join(data_dir, "sample_trailer.mp4")
     dummy_data = b"0" * 1024
     with open(video_file_path, "wb") as f:
         f.write(dummy_data)
@@ -157,6 +162,20 @@ def test_stream_video_endpoint(test_env):
     assert resp_range.headers["Content-Length"] == "500"
     assert len(resp_range.content) == 500
 
+    # Test path traversal security check (file outside data_dir)
+    outside_file = os.path.join(tmpdir, "sensitive.txt")
+    with open(outside_file, "w") as f:
+        f.write("secret data")
+    
+    bad_item_id = upsert_media_item(
+        db_path, title="Malicious", type="movie", release_year=2024, season_name=None, folder_name="Bad"
+    )
+    update_media_item_status(db_path, bad_item_id, "downloaded", file_path=outside_file)
+    
+    resp_traversal = client.get(f"/stream/video/{bad_item_id}")
+    assert resp_traversal.status_code == 403
+
     # Test non-existent media_item
     resp_404 = client.get("/stream/video/99999")
     assert resp_404.status_code == 404
+

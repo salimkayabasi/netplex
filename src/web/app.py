@@ -210,6 +210,14 @@ def stream_video(
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Media file not found")
 
+    # Security: Validate path traversal to ensure file is inside allowed NETPLEX_DATA_DIR
+    data_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
+    abs_media_dir = os.path.realpath(data_dir)
+    abs_file_path = os.path.realpath(file_path)
+    if os.path.commonpath([abs_file_path, abs_media_dir]) != abs_media_dir or abs_file_path == abs_media_dir:
+        logger.error(f"Security: Path traversal blocked for file '{file_path}' outside '{abs_media_dir}'")
+        raise HTTPException(status_code=403, detail="Access denied: Invalid media path")
+
     file_size = os.path.getsize(file_path)
 
     if range:

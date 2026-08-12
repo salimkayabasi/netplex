@@ -1,8 +1,15 @@
 # NetPlex 🎬🍿
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **NetPlex** is a Docker-based scraper and metadata synchronization utility that connects Netflix's weekly Top 10 rankings directly to your Plex Media Server.
 
 It runs as a background Docker container, downloading the latest Netflix Top 10 charts, extracting trailer videos and subtitles directly from public Netflix CDNs, and organizing them in a flat, Plex-optimized format. It also integrates with the Plex API to synchronize lists directly as custom Plex Collections or Playlists.
+
+> **⚖️ Formal Legal Notice & Disclaimer**:  
+> **Non-Commercial Hobby Project**: NetPlex was created strictly as a non-commercial hobby and experimental personal project. There are no plans, intentions, or recommendations to commercialize, monetize, or offer this software as a enterprise/commercial service.  
+> **Copyright & Content Rights**: Unauthorized downloading, copying, or distribution of copyrighted or private media content without explicit authorization from rights holders is illegal. NetPlex is designed strictly to operate on publicly accessible metadata and promotional trailer assets.  
+> **Assumption of Risk & Liability**: Anyone using, deploying, or modifying this repository for any purpose does so **entirely at their own risk**. The authors, maintainers, and contributors explicitly disclaim all liability and legal responsibility for any misuse, policy violations, or damages resulting from the use of this software.
 
 ---
 
@@ -97,3 +104,26 @@ For more detailed technical descriptions, consult the guides below:
 * ⚙️ **[configuration.md](docs/configuration.md)**: Details on Web UI settings, SQLite database configurations, and monitored tables.
 * 🚢 **[deployment.md](docs/deployment.md)**: Complete guide on deploying NetPlex via Docker and Docker Compose.
 * 🎛️ **[plex-integration.md](docs/plex-integration.md)**: Setup instructions for Plex libraries, NFO agents, and authentication details.
+
+---
+
+## 🔒 Security & Reporting
+
+Please review our [SECURITY.md](SECURITY.md) policy to report any security vulnerabilities responsibly.
+
+---
+
+## ⚖️ Legal Disclaimer & Limitation of Liability
+
+1. **Hobby & Non-Commercial Purpose**: NetPlex is implemented purely as a personal hobby and experimental software project. It is not intended, recommended, or designed for commercial deployment, enterprise environments, or paid services. The maintainers have no plans to commercialize or monetize this project.
+2. **Third-Party Trademarks**: NetPlex is an independent, community-driven project and is **not** affiliated, associated, authorized, endorsed by, or in any way officially connected with **Netflix, Inc.** or **Plex, Inc.**, or any of their subsidiaries or affiliates. All trademarks and brand names are the property of their respective owners.
+3. **Copyright & Illegal Content Notice**: Users are strictly reminded that downloading, copying, storing, or distributing private, copyrighted, or non-public media content without the explicit consent of the copyright holder is illegal under applicable local and international copyright laws.
+4. **Use at Own Risk**: Any person or organization using, executing, deploying, or distributing this codebase for any purpose does so **entirely at their own risk**. The creators and maintainers provide this software "as-is" without warranties of any kind and assume zero liability for any legal claims, service suspensions, data loss, or damages arising from its use.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for full details.
+
+

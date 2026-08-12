@@ -1,6 +1,15 @@
 # Workspace / Project Ignore Rules
 *.tsv
 
+# Environment Secrets
+.env
+.env.*
+!.env.example
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
 
 # Virtual Environment
 .venv/
@@ -12,13 +21,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Pytest / Cache
+# Pytest / Cache & Logs
 .pytest_cache/
 .cache/
+*.log
+logs/
+
+# IDE & OS Artifacts
+.DS_Store
+.vscode/
+.idea/
 
 # Local Scratch & Runtime Data
 scratch/
 .docker/
 config/
 media/
+
 
