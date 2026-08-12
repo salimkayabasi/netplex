@@ -53,12 +53,25 @@ def test_landing_page_endpoint(test_env):
         media_item_id=item_id
     )
 
-    response = client.get("/?country=US&category=TV")
+    # Test /tv endpoint directly
+    response = client.get("/tv")
     assert response.status_code == 200
     assert "Stranger Things" in response.text
     assert "NetPlex" in response.text
     assert 'class="rank-badge">01</div>' in response.text or '01' in response.text
     assert 'badge-status status-pending' in response.text
+    assert 'href="/movies"' in response.text
+    assert 'href="/tv"' in response.text
+
+    # Test legacy query param redirect /?category=TV
+    response_redirect = client.get("/?category=TV", follow_redirects=False)
+    assert response_redirect.status_code == 307
+    assert response_redirect.headers["location"] == "/tv"
+
+    # Test root / redirecting to /movies
+    response_root = client.get("/", follow_redirects=False)
+    assert response_root.status_code == 307
+    assert response_root.headers["location"] == "/movies"
 
 def test_sequential_country_sections(test_env):
     client = test_env["client"]
@@ -77,7 +90,7 @@ def test_sequential_country_sections(test_env):
     insert_ranking(db_path, "TR", "Movies", 1, "2026-08-01", item2)
     insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item3)
 
-    response = client.get("/")
+    response = client.get("/movies")
     assert response.status_code == 200
     text = response.text
     # Verify sequential order: Global appears before Turkey, Turkey appears before United States
@@ -172,19 +185,18 @@ def test_dummy_media_mode_ui_and_stream(test_env, monkeypatch):
 
     # 1. When dummy_media_mode is false (default)
     set_setting(db_path, "dummy_media_mode", "false")
-    resp_normal = client.get("/")
+    resp_normal = client.get("/movies")
     assert resp_normal.status_code == 200
     assert "window.DUMMY_MEDIA_MODE = false;" in resp_normal.text
-    assert 'onclick="openTrailerModal(' in resp_normal.text
+    assert f'href="/movie/{item_id}"' in resp_normal.text
     assert 'class="play-overlay"' in resp_normal.text
 
     # 2. When dummy_media_mode is true
     set_setting(db_path, "dummy_media_mode", "true")
-    resp_dummy = client.get("/")
+    resp_dummy = client.get("/movies")
     assert resp_dummy.status_code == 200
     assert "window.DUMMY_MEDIA_MODE = true;" in resp_dummy.text
     assert 'class="media-card dummy-mode"' in resp_dummy.text
-    assert 'onclick="openTrailerModal(' not in resp_dummy.text
     assert 'class="play-overlay"' not in resp_dummy.text
 
     # 3. Stream endpoint when dummy_media_mode is true or file size is 0
@@ -206,16 +218,81 @@ def test_youtube_button_in_player_modal(test_env):
         release_year=2024,
         season_name=None,
         folder_name="Rick Roll Movie (2024)",
-        youtube_url=yt_url
+        youtube_url=yt_url,
+        netflix_id=999888
     )
     insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item_id)
 
-    response = client.get("/")
+    response = client.get("/movies")
     assert response.status_code == 200
     assert 'id="modal-yt-btn"' in response.text
-    assert 'Watch on YouTube' in response.text
-    assert 'target="_blank"' in response.text
+    assert 'href="/movie/999888"' in response.text
     assert f'data-youtube-url="{yt_url}"' in response.text
+
+    # Test detail page YouTube button
+    resp_detail = client.get("/movie/999888")
+    assert resp_detail.status_code == 200
+    assert yt_url in resp_detail.text
+    assert 'Watch Trailer on YouTube' in resp_detail.text
+
+
+def test_detail_page_movie_and_tv(test_env, monkeypatch):
+    client = test_env["client"]
+    db_path = test_env["db_path"]
+    tmpdir = test_env["tmpdir"]
+
+    data_dir = os.path.join(tmpdir, "media")
+    os.makedirs(data_dir, exist_ok=True)
+    monkeypatch.setenv("NETPLEX_DATA_DIR", data_dir)
+
+    movie_dir = os.path.join(data_dir, "movies", "72 HOURS (2026)")
+    os.makedirs(movie_dir, exist_ok=True)
+    
+    nfo_content = """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<movie>
+    <title>72 HOURS</title>
+    <year>2026</year>
+    <plot>To save his career, a 40-year-old ad exec joins a crew of twentysomethings.</plot>
+    <tagline>Wild Miami Bachelor Party</tagline>
+    <mpaa>TV-MA</mpaa>
+    <runtime>105</runtime>
+    <genre>Comedy</genre>
+    <director>John Smith</director>
+    <actor><name>Actor Alpha</name></actor>
+    <uniqueid type="netflix" default="true">81715790</uniqueid>
+</movie>"""
+    with open(os.path.join(movie_dir, "movie.nfo"), "w") as f:
+        f.write(nfo_content)
+
+    video_file = os.path.join(movie_dir, "72 HOURS (2026).mp4")
+    with open(video_file, "wb") as f:
+        f.write(b"0" * 1024)
+
+    item_id = upsert_media_item(
+        db_path,
+        title="72 HOURS",
+        type="movie",
+        release_year=2026,
+        season_name=None,
+        folder_name="72 HOURS (2026)",
+        netflix_id=81715790
+    )
+    from src.database import update_media_item_status
+    update_media_item_status(db_path, item_id, "downloaded", file_path=video_file)
+
+    resp = client.get("/movie/81715790")
+    assert resp.status_code == 200
+    assert "72 HOURS" in resp.text
+    assert "To save his career" in resp.text
+    assert "Wild Miami Bachelor Party" in resp.text
+    assert "Comedy" in resp.text
+    assert "John Smith" in resp.text
+    assert "Actor Alpha" in resp.text
+    assert "https://www.netflix.com/title/81715790" in resp.text
+
+    # Test 404 when non-existent item is requested
+    resp_404 = client.get("/movie/999999999")
+    assert resp_404.status_code == 404
 
 
 

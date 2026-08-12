@@ -2,9 +2,10 @@ import os
 import re
 import urllib.request
 import logging
+import xml.etree.ElementTree as ET
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Header, Query
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -12,7 +13,8 @@ from src.database import (
     _get_connection,
     get_monitored_countries,
     get_active_rankings,
-    get_setting
+    get_setting,
+    get_media_item_by_netflix_id
 )
 
 logger = logging.getLogger(__name__)
@@ -57,11 +59,102 @@ COUNTRY_NAMES = {
     "TR": "Turkey"
 }
 
-@app.get("/", response_class=HTMLResponse)
-def landing_page(
-    request: Request,
-    category: str = Query("Movies")
-):
+def find_and_parse_nfo(media_item: dict) -> dict:
+    data_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
+    possible_dirs = []
+    
+    file_path = media_item.get("file_path")
+    if file_path:
+        d = os.path.dirname(file_path)
+        possible_dirs.append(d)
+        possible_dirs.append(os.path.dirname(d))
+        
+    folder_name = media_item.get("folder_name")
+    if folder_name:
+        possible_dirs.append(os.path.join(data_dir, "movies", folder_name))
+        possible_dirs.append(os.path.join(data_dir, "tv", folder_name))
+        
+    nfo_path = None
+    for d in possible_dirs:
+        if not d or not os.path.exists(d):
+            continue
+        for candidate in ["movie.nfo", "tvshow.nfo"]:
+            cp = os.path.join(d, candidate)
+            if os.path.exists(cp):
+                nfo_path = cp
+                break
+        if nfo_path:
+            break
+        try:
+            for fname in os.listdir(d):
+                if fname.lower().endswith(".nfo"):
+                    nfo_path = os.path.join(d, fname)
+                    break
+        except Exception:
+            pass
+        if nfo_path:
+            break
+
+    nfo_data = {
+        "plot": None,
+        "tagline": None,
+        "maturity_rating": None,
+        "runtime_seconds": None,
+        "studio": None,
+        "country": None,
+        "genres": [],
+        "directors": [],
+        "creators": [],
+        "actors": [],
+    }
+    
+    if nfo_path and os.path.exists(nfo_path):
+        try:
+            tree = ET.parse(nfo_path)
+            root = tree.getroot()
+            
+            plot_el = root.find("plot")
+            if plot_el is not None and plot_el.text:
+                nfo_data["plot"] = plot_el.text.strip()
+
+            tagline_el = root.find("tagline")
+            if tagline_el is not None and tagline_el.text:
+                nfo_data["tagline"] = tagline_el.text.strip()
+
+            mpaa_el = root.find("mpaa")
+            if mpaa_el is None:
+                mpaa_el = root.find("certification")
+            if mpaa_el is not None and mpaa_el.text:
+                nfo_data["maturity_rating"] = mpaa_el.text.strip()
+            
+            runtime_el = root.find("runtime")
+            if runtime_el is not None and runtime_el.text and runtime_el.text.strip().isdigit():
+                nfo_data["runtime_seconds"] = int(runtime_el.text.strip()) * 60
+
+            studio_el = root.find("studio")
+            if studio_el is not None and studio_el.text:
+                nfo_data["studio"] = studio_el.text.strip()
+
+            country_el = root.find("country")
+            if country_el is not None and country_el.text:
+                nfo_data["country"] = country_el.text.strip()
+
+            nfo_data["genres"] = [g.text.strip() for g in root.findall("genre") if g.text and g.text.strip()]
+            nfo_data["directors"] = [d.text.strip() for d in root.findall("director") if d.text and d.text.strip()]
+            nfo_data["creators"] = [c.text.strip() for c in root.findall("credits") if c.text and c.text.strip()]
+            
+            actors = []
+            for actor_el in root.findall("actor"):
+                name_el = actor_el.find("name")
+                if name_el is not None and name_el.text and name_el.text.strip():
+                    actors.append(name_el.text.strip())
+            nfo_data["actors"] = actors
+        except Exception as e:
+            logger.error(f"Error reading NFO at {nfo_path}: {e}")
+            
+    return nfo_data
+
+def render_landing_page(request: Request, category: str):
     db_path = get_db_path(request)
     
     # Get monitored countries in settings menu insertion order
@@ -121,6 +214,83 @@ def landing_page(
             "dummy_media_mode": dummy_media_mode
         }
     )
+
+@app.get("/", response_class=HTMLResponse)
+def landing_page_root(request: Request, category: Optional[str] = Query(None)):
+    if category:
+        if category.lower() == "tv":
+            return RedirectResponse(url="/tv", status_code=307)
+        return RedirectResponse(url="/movies", status_code=307)
+    return RedirectResponse(url="/movies", status_code=307)
+
+@app.get("/movies", response_class=HTMLResponse)
+def movies_page(request: Request):
+    return render_landing_page(request, "Movies")
+
+@app.get("/tv", response_class=HTMLResponse)
+def tv_page(request: Request):
+    return render_landing_page(request, "TV")
+
+def render_detail_page(request: Request, netflix_id: str, item_type: str):
+    db_path = get_db_path(request)
+    media_item = get_media_item_by_netflix_id(db_path, netflix_id, item_type)
+    if not media_item:
+        raise HTTPException(status_code=404, detail=f"Media item with Netflix ID '{netflix_id}' not found")
+
+    dummy_media_mode = False
+    try:
+        dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    except Exception:
+        pass
+
+    nfo_data = find_and_parse_nfo(media_item)
+
+    plot = nfo_data["plot"] or media_item.get("synopsis") or f"Top 10 Netflix content for {media_item.get('title')}."
+    tagline = nfo_data["tagline"]
+    maturity_rating = nfo_data["maturity_rating"] or media_item.get("maturity_rating")
+    
+    runtime_sec = nfo_data["runtime_seconds"] or media_item.get("runtime_seconds")
+    formatted_runtime = None
+    if runtime_sec and runtime_sec > 0:
+        mins = runtime_sec // 60
+        if mins >= 60:
+            hrs = mins // 60
+            rem_mins = mins % 60
+            formatted_runtime = f"{hrs}h {rem_mins}m" if rem_mins else f"{hrs}h"
+        else:
+            formatted_runtime = f"{mins}m"
+
+    studio = nfo_data["studio"] or "Netflix"
+
+    details = {
+        "plot": plot,
+        "tagline": tagline,
+        "maturity_rating": maturity_rating,
+        "formatted_runtime": formatted_runtime,
+        "studio": studio,
+        "genres": nfo_data["genres"],
+        "directors": nfo_data["directors"],
+        "creators": nfo_data["creators"],
+        "actors": nfo_data["actors"],
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="detail.html",
+        context={
+            "media_item": media_item,
+            "details": details,
+            "dummy_media_mode": dummy_media_mode,
+        }
+    )
+
+@app.get("/movie/{netflix_id}", response_class=HTMLResponse)
+def movie_detail_page(request: Request, netflix_id: str):
+    return render_detail_page(request, netflix_id, "movie")
+
+@app.get("/tv/{netflix_id}", response_class=HTMLResponse)
+def tv_detail_page(request: Request, netflix_id: str):
+    return render_detail_page(request, netflix_id, "tv")
 
 @app.get("/stream/video/{item_id}")
 def stream_video(

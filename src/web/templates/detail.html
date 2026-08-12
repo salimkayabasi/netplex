@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}{{ media_item.title }} - NetPlex{% endblock %}
+
+{% block content %}
+<script>
+    window.DUMMY_MEDIA_MODE = {{ 'true' if dummy_media_mode else 'false' }};
+</script>
+
+<div class="detail-container">
+    <div class="detail-nav">
+        <a href="{% if media_item.type == 'tv' %}/tv{% else %}/movies{% endif %}" class="back-link">
+            ← Back to {% if media_item.type == 'tv' %}TV Shows{% else %}Movies{% endif %}
+        </a>
+    </div>
+
+    <!-- Hero Player / Media Section -->
+    <div class="detail-hero">
+        {% if media_item.status == 'downloaded' and not dummy_media_mode %}
+            <div class="detail-video-wrapper">
+                <video id="detail-video-player" class="detail-video-player" controls autoplay preload="metadata" {% if media_item.poster_url %}poster="{{ media_item.poster_url }}"{% endif %}>
+                    <source src="/stream/video/{{ media_item.id }}" type="video/mp4">
+                    Your browser does not support HTML5 video streaming.
+                </video>
+            </div>
+        {% else %}
+            <!-- Stub / Pending / Placeholder Banner -->
+            <div class="detail-placeholder-hero">
+                {% if media_item.poster_url %}
+                    <img src="{{ media_item.poster_url }}" alt="{{ media_item.title }}" class="detail-hero-backdrop">
+                {% endif %}
+                <div class="detail-hero-overlay">
+                    {% if media_item.logo_url %}
+                        <img src="{{ media_item.logo_url }}" alt="{{ media_item.title }}" class="detail-hero-logo">
+                    {% else %}
+                        <h1 class="detail-hero-title">{{ media_item.title }}</h1>
+                    {% endif %}
+                    <div class="detail-hero-status-message">
+                        {% if dummy_media_mode %}
+                            <span class="status-pill status-stub">Dummy Media Mode Enabled (Zero-byte Stub)</span>
+                        {% elif media_item.status == 'pending' %}
+                            <span class="status-pill status-pending">Trailer Download Pending</span>
+                        {% elif media_item.status == 'failed' %}
+                            <span class="status-pill status-failed">Trailer Download Failed</span>
+                        {% else %}
+                            <span class="status-pill status-{{ media_item.status }}">{{ media_item.status | capitalize }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if media_item.youtube_url %}
+            <div class="detail-yt-bar">
+                <a href="{{ media_item.youtube_url }}" target="_blank" rel="noopener noreferrer" class="btn-watch-youtube detail-yt-btn">
+                    <svg class="yt-icon" viewBox="0 0 24 24" width="24" height="18">
+                        <path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/>
+                        <path fill="#FFFFFF" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <span>Watch Trailer on YouTube</span>
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Metadata Section below Video -->
+    <div class="detail-content-grid">
+        <div class="detail-main-info">
+            <div class="detail-header-row">
+                <h1 class="detail-title">
+                    {{ media_item.title }}
+                    {% if media_item.local_title and media_item.local_title.strip().lower() != media_item.title.strip().lower() %}
+                        <span class="detail-local-title">/ {{ media_item.local_title }}</span>
+                    {% endif %}
+                </h1>
+            </div>
+
+            <div class="detail-meta-badges">
+                <span class="badge-type">{{ media_item.type | upper }}</span>
+                <span class="meta-item">{{ media_item.release_year }}</span>
+                {% if media_item.season_name %}
+                    <span class="meta-item">• {{ media_item.season_name }}</span>
+                {% endif %}
+                {% if details.formatted_runtime %}
+                    <span class="meta-item">• {{ details.formatted_runtime }}</span>
+                {% endif %}
+                {% if details.maturity_rating %}
+                    <span class="badge-rating">{{ details.maturity_rating }}</span>
+                {% endif %}
+                {% if media_item.status %}
+                    <span class="badge-status status-{{ media_item.status }}">
+                        {% if media_item.status == 'downloaded' %}
+                            {% if dummy_media_mode %}Stub{% else %}Ready{% endif %}
+                        {% else %}
+                            {{ media_item.status | capitalize }}
+                        {% endif %}
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if details.tagline %}
+                <p class="detail-tagline">"{{ details.tagline }}"</p>
+            {% endif %}
+
+            {% if details.plot %}
+                <div class="detail-synopsis-box">
+                    <h3>Overview</h3>
+                    <p class="detail-synopsis">{{ details.plot }}</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="detail-sidebar-info">
+            {% if details.genres %}
+                <div class="sidebar-group">
+                    <span class="sidebar-label">Genres</span>
+                    <div class="pill-list">
+                        {% for genre in details.genres %}
+                            <span class="meta-pill">{{ genre }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if details.directors %}
+                <div class="sidebar-group">
+                    <span class="sidebar-label">Directors</span>
+                    <div class="pill-list">
+                        {% for director in details.directors %}
+                            <span class="meta-pill director-pill">{{ director }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if details.creators %}
+                <div class="sidebar-group">
+                    <span class="sidebar-label">Creators / Writers</span>
+                    <div class="pill-list">
+                        {% for creator in details.creators %}
+                            <span class="meta-pill creator-pill">{{ creator }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if details.actors %}
+                <div class="sidebar-group">
+                    <span class="sidebar-label">Cast</span>
+                    <div class="pill-list">
+                        {% for actor in details.actors %}
+                            <span class="meta-pill actor-pill">{{ actor }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if details.studio %}
+                <div class="sidebar-group">
+                    <span class="sidebar-label">Studio</span>
+                    <span class="meta-value">{{ details.studio }}</span>
+                </div>
+            {% endif %}
+
+            {% if media_item.netflix_id %}
+                <div class="sidebar-group netflix-link-group">
+                    <a href="https://www.netflix.com/title/{{ media_item.netflix_id }}" target="_blank" rel="noopener noreferrer" class="btn-netflix-link">
+                        <span>View on Netflix</span>
+                        <span class="netflix-id-tag">ID: {{ media_item.netflix_id }}</span>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

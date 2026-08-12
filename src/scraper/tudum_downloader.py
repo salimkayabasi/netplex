@@ -202,16 +202,36 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     tag_elements = re.findall(r'data-uia="tag"[^>]*>(.*?)</span>', content, re.DOTALL)
     for tag_html in tag_elements:
         clean_t = re.sub(r'<[^>]+>', '', tag_html).strip()
-        if clean_t:
-            tags.append(clean_t)
-            s_match = re.search(r'(\d+)\s+Seasons?', clean_t, re.IGNORECASE)
-            if s_match:
-                try:
-                    season_count = int(s_match.group(1))
-                except ValueError:
-                    pass
-            if not maturity_rating and clean_t in ['TV-MA', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'PG-13', 'PG', 'R', 'G', 'NC-17']:
-                maturity_rating = clean_t
+        if not clean_t:
+            continue
+            
+        # Check if tag is runtime duration (e.g. "1:52:10", "45m", "1h 30m")
+        time_match = re.search(r'^(?:(\d+):)?(\d{1,2}):(\d{2})$', clean_t)
+        if time_match:
+            h = int(time_match.group(1) or 0)
+            m = int(time_match.group(2))
+            s = int(time_match.group(3))
+            if not runtime_seconds:
+                runtime_seconds = h * 3600 + m * 60 + s
+            continue
+
+        hm_match = re.search(r'^(?:(\d+)\s*h)?\s*(\d+)\s*m$', clean_t, re.IGNORECASE)
+        if hm_match:
+            h = int(hm_match.group(1) or 0)
+            m = int(hm_match.group(2))
+            if not runtime_seconds:
+                runtime_seconds = h * 3600 + m * 60
+            continue
+
+        tags.append(clean_t)
+        s_match = re.search(r'(\d+)\s+Seasons?', clean_t, re.IGNORECASE)
+        if s_match:
+            try:
+                season_count = int(s_match.group(1))
+            except ValueError:
+                pass
+        if not maturity_rating and clean_t in ['TV-MA', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'PG-13', 'PG', 'R', 'G', 'NC-17']:
+            maturity_rating = clean_t
 
     # Extract cast / actors
     actors = []
@@ -271,7 +291,7 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     creators = list(dict.fromkeys(creators))
     tags = list(dict.fromkeys(tags))
 
-    genres = [t for t in tags if t not in ['TV-14', 'TV-MA', 'PG-13', 'R', 'TV-PG'] and not re.search(r'^\d{4}$', t) and not 'Season' in t]
+    genres = [t for t in tags if t not in ['TV-14', 'TV-MA', 'PG-13', 'R', 'TV-PG', 'TV-G', 'TV-Y7', 'PG', 'G', 'NC-17'] and not re.search(r'^\d{4}$', t) and 'Season' not in t]
 
     return {
         "video_url": video_url,

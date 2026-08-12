@@ -9,11 +9,11 @@
 
 <div class="top-controls-bar">
     <div class="category-toggle-container">
-        <a href="/?category=Movies" 
+        <a href="/movies" 
            class="tab-btn {% if selected_category == 'Movies' %}active{% endif %}">
             Movies
         </a>
-        <a href="/?category=TV" 
+        <a href="/tv" 
            class="tab-btn {% if selected_category == 'TV' %}active{% endif %}">
             TV Shows
         </a>
@@ -37,13 +37,11 @@
         {% if section.rankings %}
         <div class="ranking-grid">
             {% for item in section.rankings %}
-            <div class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}"
-                 {% if not dummy_media_mode %}
-                 data-media-id="{{ item.media_item_id }}"
-                 data-title="{{ item.title | escape }}"
-                 data-youtube-url="{{ item.youtube_url if item.youtube_url else '' }}"
-                 onclick="openTrailerModal(this.dataset.mediaId, this.dataset.title, this.dataset.youtubeUrl)"
-                 {% endif %}>
+            <a href="/{% if item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ item.netflix_id if item.netflix_id else item.media_item_id }}"
+               class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}"
+               data-media-id="{{ item.media_item_id }}"
+               data-title="{{ item.title | escape }}"
+               data-youtube-url="{{ item.youtube_url if item.youtube_url else '' }}">
                 <div class="rank-badge">{% if item.rank < 10 %}0{{ item.rank }}{% else %}{{ item.rank }}{% endif %}</div>
                 <div class="card-poster">
                     {% if item.poster_url %}
@@ -80,7 +78,7 @@
                         {% endif %}
                     </div>
                 </div>
-            </div>
+            </a>
             {% endfor %}
         </div>
         {% else %}

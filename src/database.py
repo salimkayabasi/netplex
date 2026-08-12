@@ -442,6 +442,32 @@ def get_orphaned_media_items(db_path: str, current_week: str) -> list[dict]:
     finally:
         conn.close()
 
+def get_media_item_by_netflix_id(db_path: str, netflix_id_or_id: int | str, item_type: str | None = None) -> dict | None:
+    conn = _get_connection(db_path)
+    try:
+        val_str = str(netflix_id_or_id)
+        val_int = int(netflix_id_or_id) if val_str.isdigit() else -1
+        
+        if item_type:
+            cursor = conn.execute("""
+                SELECT * FROM media_items
+                WHERE (netflix_id = ? OR netflix_id = ? OR id = ?) AND type = ?
+                LIMIT 1
+            """, (val_int, val_str, val_int, item_type.lower()))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+        
+        cursor = conn.execute("""
+            SELECT * FROM media_items
+            WHERE netflix_id = ? OR netflix_id = ? OR id = ?
+            LIMIT 1
+        """, (val_int, val_str, val_int))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
 def calculate_expected_total_tasks(db_path: str) -> int:
     """Calculates total expected content items to crawl based on monitored countries and types (10 items per format)."""
     conn = _get_connection(db_path)
