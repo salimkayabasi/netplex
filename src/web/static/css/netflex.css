@@ -331,32 +331,66 @@ body {
 .badge-status {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.65rem;
+    gap: 0.35rem;
+    font-size: 0.62rem;
     font-weight: 700;
-    padding: 0.15rem 0.45rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.45rem;
     border-radius: 3px;
     line-height: 1;
     margin-left: auto;
     white-space: nowrap;
 }
 
+.badge-status::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: currentColor;
+    box-shadow: 0 0 4px currentColor;
+    flex-shrink: 0;
+}
+
 .badge-status.status-downloaded {
-    background-color: rgba(46, 204, 113, 0.15);
-    color: #2ecc71;
-    border: 1px solid rgba(46, 204, 113, 0.3);
+    background-color: rgba(70, 211, 105, 0.12);
+    color: #46d369;
+    border: 1px solid rgba(70, 211, 105, 0.3);
+}
+
+.badge-status.status-downloaded.status-stub {
+    background-color: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
 .badge-status.status-pending {
-    background-color: rgba(241, 196, 15, 0.15);
-    color: #f1c40f;
-    border: 1px solid rgba(241, 196, 15, 0.3);
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-status.status-pending::before {
+    animation: status-pulse 1.5s infinite ease-in-out;
 }
 
 .badge-status.status-failed {
-    background-color: rgba(231, 76, 60, 0.15);
-    color: #e74c3c;
-    border: 1px solid rgba(231, 76, 60, 0.3);
+    background-color: rgba(229, 9, 20, 0.12);
+    color: #ff4d4d;
+    border: 1px solid rgba(229, 9, 20, 0.3);
+}
+
+@keyframes status-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(0.85);
+    }
 }
 
 /* Modal Overlay */
