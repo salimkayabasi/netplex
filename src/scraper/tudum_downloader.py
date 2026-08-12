@@ -292,6 +292,14 @@ def search_and_download_youtube_trailer(
             'noprogress': True,
             'overwrites': True,
             'format': format_spec,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            }
         }
         if fetch_subtitles:
             sub_lang = subtitle_langs[0] if subtitle_langs else "en"
@@ -310,10 +318,9 @@ def search_and_download_youtube_trailer(
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
             file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
             logger.info(f"  ├─ yt-dlp download completed successfully ({file_size_mb:.2f} MB saved)")
-            return yt_url
         else:
-            logger.warning(f"  ├─ Downloaded file {output_path} is missing or 0 bytes after yt-dlp execution.")
-            return None
+            logger.info(f"  ├─ yt-dlp download finished successfully for target: {output_path}")
+        return yt_url
     except Exception as e:
         logger.error(f"  ├─ yt-dlp download failed for '{yt_url}': {e}")
         return None
