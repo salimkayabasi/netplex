@@ -7,9 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/netplex.css">
-    <!-- Cached Tudum branding override if available -->
-    <link rel="stylesheet" href="/config/www/tudum.css" onerror="this.remove()">
+    <link rel="stylesheet" href="/static/css/netflex.css">
 </head>
 <body>
     <header class="navbar">
@@ -18,10 +16,10 @@
             <span class="brand-tag">TOP 10</span>
         </a>
         <div class="filter-bar">
-            <button id="btn-landing-crawl" type="button" class="tab-btn" onclick="triggerManualCrawlFromLanding()" style="cursor: pointer; background: rgba(39, 174, 96, 0.2); border: 1px solid #27ae60; color: #2ecc71; display: flex; align-items: center; gap: 0.4rem;">
+            <button id="btn-landing-crawl" type="button" class="tab-btn tab-btn-crawl" onclick="triggerManualCrawlFromLanding()">
                 ▶ Trigger Crawl
             </button>
-            <a href="/settings" class="tab-btn" style="text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
+            <a href="/settings" class="tab-btn tab-btn-link">
                 ⚙️ Settings
             </a>
         </div>
@@ -44,6 +42,6 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js"></script>
+    <script src="/static/js/netflex.js"></script>
 </body>
 </html>

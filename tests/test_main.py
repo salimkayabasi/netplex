@@ -14,9 +14,8 @@ def test_main_initialization(tmp_path):
         "NETPLEX_CONFIG_DIR": config_dir,
         "NETPLEX_PORT": "8999"
     }):
-        # Mock download_and_cache_tudum_css and start_scheduler/run_server so main runs once
-        with patch("main.download_and_cache_tudum_css") as mock_css, \
-             patch("main.start_scheduler") as mock_sched, \
+        # Mock start_scheduler/run_server so main runs once
+        with patch("main.start_scheduler") as mock_sched, \
              patch("main.run_server") as mock_server:
             
             mock_server.return_value = None

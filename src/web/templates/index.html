@@ -55,7 +55,7 @@
                 </div>
                 <div class="card-info">
                     <div class="card-title" title="{% if item.local_title and item.local_title.strip().lower() != item.title.strip().lower() %}{{ item.title }} / {{ item.local_title }}{% else %}{{ item.title }}{% endif %}">
-                        {{ item.title }}{% if item.local_title and item.local_title.strip().lower() != item.title.strip().lower() %} <span style="font-weight: 400; opacity: 0.85;">/ {{ item.local_title }}</span>{% endif %}
+                        {{ item.title }}{% if item.local_title and item.local_title.strip().lower() != item.title.strip().lower() %} <span class="card-title-local">/ {{ item.local_title }}</span>{% endif %}
                     </div>
                     <div class="card-meta">
                         <span class="badge-type">{{ item.type }}</span>
@@ -76,12 +76,12 @@
     </section>
     {% endfor %}
 {% else %}
-    <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.15); max-width: 600px; margin: 3rem auto;">
-        <h3 style="font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--text-primary);">No Monitored Regions Configured</h3>
-        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; max-width: 520px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+    <div class="empty-state">
+        <h3>No Monitored Regions Configured</h3>
+        <p>
             NetPlex is currently unconfigured. Please select countries and content formats (Movies/TV Shows) in Settings to enable Top 10 rankings monitoring.
         </p>
-        <a href="/settings" class="tab-btn active" style="text-decoration: none; padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; background-color: var(--netflix-red); border: none; color: #fff; border-radius: 4px;">
+        <a href="/settings" class="tab-btn active empty-state-btn">
             ⚙️ Configure Monitored Regions
         </a>
     </div>

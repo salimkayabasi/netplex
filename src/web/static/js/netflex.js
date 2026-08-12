@@ -132,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     function stopPolling() {
         if (crawlPollInterval) {
             clearInterval(crawlPollInterval);

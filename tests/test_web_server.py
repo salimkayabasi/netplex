@@ -9,11 +9,7 @@ from src.database import (
     upsert_media_item,
     insert_ranking
 )
-from src.web.app import (
-    app,
-    download_and_cache_tudum_css,
-    ensure_config_www_mounted
-)
+from src.web.app import app
 
 @pytest.fixture
 def test_env():
@@ -25,7 +21,6 @@ def test_env():
         # Configure app state
         app.state.db_path = db_path
         app.state.config_dir = config_dir
-        ensure_config_www_mounted(config_dir)
         
         client = TestClient(app)
         yield {
@@ -93,32 +88,6 @@ def test_sequential_country_sections(test_env):
     assert pos_tr != -1
     assert pos_us != -1
     assert pos_global < pos_tr < pos_us
-
-def test_download_and_cache_tudum_css(test_env):
-    config_dir = test_env["config_dir"]
-    fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures")
-    
-    html_fixture_path = os.path.join(fixtures_dir, "sample_tudum.html")
-    css_fixture_path = os.path.join(fixtures_dir, "sample_tudum_style.css")
-
-    with open(html_fixture_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-
-    with open(css_fixture_path, "r", encoding="utf-8") as f:
-        css_content = f.read()
-
-    cached_file = download_and_cache_tudum_css(
-        config_dir=config_dir,
-        html_content=html_content,
-        css_content=css_content
-    )
-
-    assert os.path.exists(cached_file)
-    assert cached_file.endswith("tudum.css")
-
-    with open(cached_file, "r", encoding="utf-8") as f:
-        saved_css = f.read()
-    assert "--tudum-brand-red" in saved_css
 
 def test_stream_video_endpoint(test_env, monkeypatch):
     client = test_env["client"]

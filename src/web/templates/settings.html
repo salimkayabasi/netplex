@@ -3,7 +3,7 @@
 {% block title %}NetPlex Settings & Control Panel{% endblock %}
 
 {% block content %}
-<div class="section-header" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+<div class="section-header settings-header">
     <div>
         <h1 class="section-title">
             ⚙️ Settings & Control Panel
@@ -12,42 +12,39 @@
             Manage monitored regions, Plex server integration, subtitle downloads, and background operations.
         </p>
     </div>
-    <div id="auto-save-badge" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); opacity: 0; transition: opacity 0.3s ease;">
+    <div id="auto-save-badge" class="auto-save-badge">
         ✓ Saved automatically
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-bottom: 2.5rem;">
+<div class="settings-grid">
 
     <!-- Card 1: Plex Integration -->
-    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+    <div class="settings-card flex-between">
         <div>
-            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+            <h2 class="card-h2">
                 🎬 Plex Server Integration
             </h2>
             
             <form id="plex-form" onsubmit="event.preventDefault(); return false;">
-                <div style="margin-bottom: 1.25rem;">
-                    <label for="plex_url" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                <div class="form-group">
+                    <label for="plex_url" class="form-label">
                         Plex Server URL
                     </label>
-                    <input type="url" id="plex_url" name="plex_url" value="{{ plex_url }}" placeholder="http://localhost:32400" required
-                           style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                    <input type="url" id="plex_url" name="plex_url" value="{{ plex_url }}" placeholder="http://localhost:32400" required class="form-control">
                 </div>
 
-                <div style="margin-bottom: 1.25rem;">
-                    <label for="plex_token" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                <div class="form-group">
+                    <label for="plex_token" class="form-label">
                         Plex Auth Token
                     </label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="plex_token" name="plex_token" value="{{ plex_token }}" placeholder="Plex Access Token"
-                               style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
-                        <button type="button" id="btn-plex-pin" onclick="startPlexPinAuth()"
-                                style="background-color: var(--netflix-red); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s;">
+                    <div class="input-row">
+                        <input type="text" id="plex_token" name="plex_token" value="{{ plex_token }}" placeholder="Plex Access Token" class="form-control flex-1">
+                        <button type="button" id="btn-plex-pin" onclick="startPlexPinAuth()" class="btn-plex-login">
                             Plex Login (PIN)
                         </button>
                     </div>
-                    <p id="plex-auth-status" style="font-size: 0.8rem; margin-top: 0.4rem; color: var(--text-secondary);">
+                    <p id="plex-auth-status" class="form-status-text">
                         {% if plex_token %}✓ Token configured{% else %}⚠️ Token not connected{% endif %}
                     </p>
                 </div>
@@ -56,50 +53,45 @@
     </div>
 
     <!-- Card 2: Sync & Subtitle Preferences -->
-    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem;">
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+    <div class="settings-card">
+        <h2 class="card-h2">
             ⏱️ Sync & Subtitle Preferences
         </h2>
         
         <form id="preferences-form" onsubmit="event.preventDefault(); return false;">
-            <div style="margin-bottom: 1rem;">
-                <label for="cron_expression" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+            <div class="form-group-sm">
+                <label for="cron_expression" class="form-label">
                     Cron Schedule Expression (5-field)
                 </label>
-                <input type="text" id="cron_expression" name="cron_expression" value="{{ cron_expression }}" placeholder="0 0 * * 2" required
-                       style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                <input type="text" id="cron_expression" name="cron_expression" value="{{ cron_expression }}" placeholder="0 0 * * 2" required class="form-control">
             </div>
 
-            <div style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
-                <input type="checkbox" id="dummy_media_mode" name="dummy_media_mode" value="true" {% if dummy_media_mode %}checked{% endif %}
-                       style="width: 18px; height: 18px; accent-color: var(--netflix-red); cursor: pointer;">
-                <label for="dummy_media_mode" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+            <div class="checkbox-row">
+                <input type="checkbox" id="dummy_media_mode" name="dummy_media_mode" value="true" {% if dummy_media_mode %}checked{% endif %} class="checkbox-input">
+                <label for="dummy_media_mode" class="checkbox-label">
                     Dummy (Zero-Byte) Trailer Mode (Media Stubs)
                 </label>
             </div>
 
-            <div style="margin-bottom: 1rem;">
-                <label for="subtitle_languages" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+            <div class="form-group-sm">
+                <label for="subtitle_languages" class="form-label">
                     Preferred Subtitle Languages (Comma-separated)
                 </label>
-                <input type="text" id="subtitle_languages" name="subtitle_languages" value="{{ subtitle_languages }}" placeholder="en, es, de"
-                       style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                <input type="text" id="subtitle_languages" name="subtitle_languages" value="{{ subtitle_languages }}" placeholder="en, es, de" class="form-control">
             </div>
 
-            <div style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
-                <input type="checkbox" id="trailer_subtitles" name="trailer_subtitles" value="true" {% if trailer_subtitles %}checked{% endif %}
-                       style="width: 18px; height: 18px; accent-color: var(--netflix-red); cursor: pointer;">
-                <label for="trailer_subtitles" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+            <div class="checkbox-row">
+                <input type="checkbox" id="trailer_subtitles" name="trailer_subtitles" value="true" {% if trailer_subtitles %}checked{% endif %} class="checkbox-input">
+                <label for="trailer_subtitles" class="checkbox-label">
                     Download Subtitles for Trailers (.srt)
                 </label>
             </div>
 
-            <div style="margin-bottom: 1rem;">
-                <label for="log_level" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+            <div class="form-group-sm">
+                <label for="log_level" class="form-label">
                     System Log Level
                 </label>
-                <select id="log_level" name="log_level"
-                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+                <select id="log_level" name="log_level" class="form-control">
                     <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
                     <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>INFO</option>
                     <option value="WARNING" {% if log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
@@ -110,22 +102,21 @@
     </div>
 
     <!-- Card 3: Manual Control Panel -->
-    <div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+    <div class="settings-card flex-between">
         <div>
-            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+            <h2 class="card-h2">
                 🚀 Manual Control Panel
             </h2>
-            <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
+            <p class="card-desc">
                 Trigger an instant execution of the scraper, trailer downloader, Plex collection sync, and cleanup pipeline in the background.
             </p>
         </div>
         
         <div>
-            <div id="crawl-status-badge" style="margin-bottom: 1rem; font-size: 0.85rem; padding: 0.5rem 0.8rem; border-radius: 4px; background-color: rgba(255,255,255,0.05); color: var(--text-secondary);">
+            <div id="crawl-status-badge" class="status-badge">
                 Status: Idle
             </div>
-            <button type="button" id="btn-trigger-crawl" onclick="triggerManualCrawl()"
-                    style="width: 100%; background-color: #27ae60; color: #fff; border: none; padding: 0.8rem 1.2rem; border-radius: 4px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: background 0.2s;">
+            <button type="button" id="btn-trigger-crawl" onclick="triggerManualCrawl()" class="btn-trigger-crawl">
                 ▶ Trigger Manual Crawl Job
             </button>
         </div>
@@ -134,80 +125,79 @@
 </div>
 
 <!-- Full-width Section: Monitored Countries Form -->
-<div style="background-color: var(--bg-card); border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.08); padding: 1.75rem; margin-bottom: 2.5rem;">
-    <div style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
+<div class="settings-section-card">
+    <div class="section-card-header">
+        <h2 class="card-h2">
             🌍 Monitored Regions & Content Formats
         </h2>
-        <p style="font-size: 0.85rem; color: var(--text-secondary);">
+        <p class="card-desc">
             Select a Netflix Top 10 country from the dropdown, choose content formats, and click Add. Changes save automatically.
         </p>
     </div>
 
     <!-- Add Region Control Bar -->
-    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem;">
-        <div style="flex: 1; min-width: 220px;">
-            <label for="add-country-select" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+    <div class="add-region-bar">
+        <div class="add-region-field-lg">
+            <label for="add-country-select" class="form-label">
                 Select Country / Region
             </label>
-            <select id="add-country-select" style="width: 100%; background: #141414; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+            <select id="add-country-select" class="select-dark">
                 {% for c in available_countries %}
                 <option value="{{ c.code }}">{{ c.name }} ({{ c.code }})</option>
                 {% endfor %}
             </select>
         </div>
 
-        <div style="min-width: 200px;">
-            <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+        <div class="add-region-field-md">
+            <label class="form-label">
                 Content Formats
             </label>
-            <div style="display: flex; gap: 1rem; align-items: center; height: 38px;">
-                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
-                    <input type="checkbox" id="add-format-movie" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+            <div class="formats-checkbox-group">
+                <label class="checkbox-inline-label">
+                    <input type="checkbox" id="add-format-movie" checked class="checkbox-inline-input">
                     Movies
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #fff; font-size: 0.9rem;">
-                    <input type="checkbox" id="add-format-tv" checked style="accent-color: var(--netflix-red); width: 16px; height: 16px;">
+                <label class="checkbox-inline-label">
+                    <input type="checkbox" id="add-format-tv" checked class="checkbox-inline-input">
                     TV Shows
                 </label>
             </div>
         </div>
 
-        <div style="align-self: flex-end;">
-            <button type="button" onclick="addMonitoredRegion()"
-                    style="background-color: #27ae60; color: #fff; border: none; padding: 0.65rem 1.25rem; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
+        <div class="btn-add-region-wrapper">
+            <button type="button" onclick="addMonitoredRegion()" class="btn-add-region">
                 ➕ Add Region
             </button>
         </div>
     </div>
 
     <!-- Monitored Regions List Container -->
-    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.75rem;">
+    <h3 class="section-subheading">
         Currently Monitored Regions
     </h3>
-    <div id="monitored-regions-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+    <div id="monitored-regions-list" class="monitored-regions-grid">
         {% for item in monitored_countries %}
         {% set c_code = item.country_code.upper() %}
         {% set fmt = item.formats %}
-        <div id="region-card-{{ c_code }}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+        <div id="region-card-{{ c_code }}" class="region-card">
             <input type="hidden" name="country_code" value="{{ c_code }}">
             <div>
-                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+                <div class="region-card-title">
                     {% set country_obj = available_countries | selectattr('code', 'equalto', c_code) | first %}
                     {% if country_obj %}{{ country_obj.name }} ({{ c_code }}){% else %}{{ c_code }}{% endif %}
                 </div>
-                <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                        <input type="checkbox" name="format_movie_{{ c_code }}" value="movie" {% if 'movie' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
+                <div class="region-card-formats">
+                    <label class="region-card-format-label">
+                        <input type="checkbox" name="format_movie_{{ c_code }}" value="movie" {% if 'movie' in fmt %}checked{% endif %} class="checkbox-inline-input">
                         Movies
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                        <input type="checkbox" name="format_tv_{{ c_code }}" value="tv" {% if 'tv' in fmt %}checked{% endif %} style="accent-color: var(--netflix-red);">
+                    <label class="region-card-format-label">
+                        <input type="checkbox" name="format_tv_{{ c_code }}" value="tv" {% if 'tv' in fmt %}checked{% endif %} class="checkbox-inline-input">
                         TV Shows
                     </label>
                 </div>
             </div>
-            <button type="button" onclick="removeMonitoredRegion('{{ c_code }}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+            <button type="button" onclick="removeMonitoredRegion('{{ c_code }}')" class="btn-remove-region">
                 🗑️ Remove
             </button>
         </div>
@@ -360,24 +350,24 @@ function addMonitoredRegion() {
 
     const name = availableCountriesMap[code] || code;
     const cardHtml = `
-        <div id="region-card-${code}" class="region-card" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between;">
+        <div id="region-card-${code}" class="region-card">
             <input type="hidden" name="country_code" value="${code}">
             <div>
-                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+                <div class="region-card-title">
                     ${name} (${code})
                 </div>
-                <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                        <input type="checkbox" name="format_movie_${code}" value="movie" ${movieChecked ? 'checked' : ''} style="accent-color: var(--netflix-red);">
+                <div class="region-card-formats">
+                    <label class="region-card-format-label">
+                        <input type="checkbox" name="format_movie_${code}" value="movie" ${movieChecked ? 'checked' : ''} class="checkbox-inline-input">
                         Movies
                     </label>
-                    <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; color: var(--text-secondary);">
-                        <input type="checkbox" name="format_tv_${code}" value="tv" ${tvChecked ? 'checked' : ''} style="accent-color: var(--netflix-red);">
+                    <label class="region-card-format-label">
+                        <input type="checkbox" name="format_tv_${code}" value="tv" ${tvChecked ? 'checked' : ''} class="checkbox-inline-input">
                         TV Shows
                     </label>
                 </div>
             </div>
-            <button type="button" onclick="removeMonitoredRegion('${code}')" style="background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; color: #e74c3c; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+            <button type="button" onclick="removeMonitoredRegion('${code}')" class="btn-remove-region">
                 🗑️ Remove
             </button>
         </div>

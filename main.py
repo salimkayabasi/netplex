@@ -3,7 +3,7 @@ import os
 import uvicorn
 from src.database import init_db
 from src.scheduler import start_scheduler
-from src.web.app import app, download_and_cache_tudum_css, ensure_config_www_mounted
+from src.web.app import app
 from src.logger import setup_logger, get_logger
 
 logger = get_logger("netplex.main")
@@ -44,16 +44,6 @@ async def main():
     # Initialize SQLite database schema
     init_db(db_path)
     app.state.db_path = db_path
-    
-    # Ensure /config/www directory is set up and mounted
-    ensure_config_www_mounted(config_dir)
-
-    # Download and cache initial Tudum CSS stylesheet
-    try:
-        download_and_cache_tudum_css(config_dir)
-        logger.info("Initial Tudum CSS cached successfully.")
-    except Exception as e:
-        logger.warning(f"Initial Tudum CSS caching encountered an issue: {e}")
 
     # Launch daemon scheduler in background thread and web server concurrently
     scheduler_task = asyncio.create_task(asyncio.to_thread(start_scheduler, db_path))

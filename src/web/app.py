@@ -22,28 +22,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    ensure_config_www_mounted(DEFAULT_CONFIG_DIR)
-    yield
-
-app = FastAPI(title="NetPlex Web Server", lifespan=lifespan)
+app = FastAPI(title="NetPlex Web Server")
 
 # Mount /static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-# Dynamic mount helper for /config/www
-def ensure_config_www_mounted(config_dir: str = "/config"):
-    www_dir = os.path.join(config_dir, "www")
-    os.makedirs(www_dir, exist_ok=True)
-    # Check if already mounted
-    for route in app.routes:
-        if getattr(route, "path", None) == "/config/www":
-            return www_dir
-    app.mount("/config/www", StaticFiles(directory=www_dir), name="config_www")
-    return www_dir
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -56,61 +38,6 @@ DEFAULT_CONFIG_DIR = os.environ.get("NETPLEX_CONFIG_DIR", "/config")
 
 def get_db_path(request: Request) -> str:
     return getattr(request.app.state, "db_path", DEFAULT_DB_PATH)
-
-def download_and_cache_tudum_css(config_dir: str = "/config", html_content: Optional[str] = None, css_content: Optional[str] = None) -> str:
-    """
-    Crawls Tudum landing page or parses html_content to locate, download, and cache the stylesheet CSS locally under {config_dir}/www/tudum.css.
-    """
-    www_dir = os.path.join(config_dir, "www")
-    os.makedirs(www_dir, exist_ok=True)
-    target_css_path = os.path.join(www_dir, "tudum.css")
-
-    if css_content:
-        with open(target_css_path, "w", encoding="utf-8") as f:
-            f.write(css_content)
-        return target_css_path
-
-    if not html_content:
-        try:
-            tudum_url = "https://www.netflix.com/tudum/"
-            req = urllib.request.Request(tudum_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                html_content = resp.read().decode('utf-8')
-        except Exception as e:
-            logger.error(f"Failed to fetch live Tudum HTML: {e}")
-
-    stylesheet_url = None
-    if html_content:
-        # Match <link ... rel="stylesheet" ... href="..."> or rel='stylesheet'
-        matches = re.findall(r'<link[^>]+href=["\']([^"\']+\.css[^"\']*)["\'][^>]*>', html_content, re.IGNORECASE)
-        if not matches:
-            matches = re.findall(r'<link[^>]+rel=["\']stylesheet["\'][^>]+href=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
-        if matches:
-            stylesheet_url = matches[0]
-
-    downloaded_css = ""
-    if stylesheet_url:
-        if not stylesheet_url.startswith("http"):
-            stylesheet_url = f"https://www.netflix.com{stylesheet_url}"
-        try:
-            req = urllib.request.Request(stylesheet_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                downloaded_css = resp.read().decode('utf-8')
-        except Exception as e:
-            logger.error(f"Failed to download Tudum CSS from {stylesheet_url}: {e}")
-
-    if not downloaded_css:
-        # Fallback CSS template
-        downloaded_css = """/* Cached Tudum Fallback Branding */
-:root {
-    --tudum-primary-bg: #141414;
-    --tudum-brand-red: #E50914;
-}"""
-
-    with open(target_css_path, "w", encoding="utf-8") as f:
-        f.write(downloaded_css)
-
-    return target_css_path
 
 COUNTRY_NAMES = {
     "GLOBAL": "Global",

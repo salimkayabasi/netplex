@@ -65,9 +65,9 @@ The frontend consists of two main pages:
   * Plex sign-in redirect button (Plex OAuth).
   * Synchronization log viewer and manual crawl triggers.
 
-### 3. Tudum Visual Identity & Local CSS Styling
+### 3. Tudum Visual Identity & Local Static Styling
 * **Aesthetics**: The UI closely matches the Netflix Tudum editorial look, featuring a bold dark background, Netflix red accents (`#E50914`), heavy header typography, and smooth card zoom hovers.
-* **Asset Caching**: To maintain style fidelity, NetPlex's crawler parses the stylesheets (`.css` files) used on the Netflix Tudum website, extracts core styles (like color variables and cards styling), and saves them locally under `/config/www/tudum.css`. The web server serves these locally-cached CSS files, ensuring the UI stays stylized even in offline deployments.
+* **Static Assets**: All visual styles and client interaction scripts are cleanly organized under `src/web/static/`, consolidated into `src/web/static/css/netflex.css` and `src/web/static/js/netflex.js`.
 
 ---
 
