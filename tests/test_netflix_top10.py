@@ -165,3 +165,34 @@ def test_crawl_netflix_top10(mock_fetch, initialized_db):
     ar_movie_rankings = get_active_rankings(initialized_db, "AR", "Movies", "2026-08-02")
     assert len(ar_movie_rankings) == 0
 
+@patch('src.scraper.netflix_top10.fetch_top10_tsv')
+def test_crawl_logging(mock_fetch, initialized_db, caplog):
+    set_monitored_country(initialized_db, "GLOBAL", "both")
+    set_monitored_country(initialized_db, "AR", "tv")
+
+    def copy_fixture(url, cache_path):
+        if "global" in url:
+            shutil.copy("tests/fixtures/all-weeks-global.tsv", cache_path)
+        else:
+            shutil.copy("tests/fixtures/all-weeks-countries.tsv", cache_path)
+        return cache_path
+    
+    mock_fetch.side_effect = copy_fixture
+
+    import logging
+    with caplog.at_level(logging.INFO, logger="netplex.crawler"):
+        crawl_netflix_top10(initialized_db)
+
+    log_messages = [rec.message for rec in caplog.records]
+    
+    assert any("Fetching regions & found 2 regions" in msg for msg in log_messages)
+    assert any("fetching GLOBAL" in msg for msg in log_messages)
+    assert any("Content types of GLOBAL: Movies, TV Shows" in msg for msg in log_messages)
+    assert any("Fetching Movies" in msg for msg in log_messages)
+    assert any("Fetching 72 HOURS" in msg for msg in log_messages)
+    assert any("Fetching TV Shows" in msg for msg in log_messages)
+    assert any("fetching AR" in msg for msg in log_messages)
+    assert any("Content types of AR: TV Shows" in msg for msg in log_messages)
+    assert any("Summary of Crawling:" in msg for msg in log_messages)
+
+

@@ -304,9 +304,62 @@ def parse_top10_data(tsv_path: str, countries_config: list[dict], target_week: s
         
     return parsed_results
 
+import time
+from src.logger import get_logger
+
+logger = get_logger("netplex.crawler")
+
+def _save_crawled_item(db_path: str, item: dict, cc: str, latest_week: str, meta_map: dict):
+    meta = meta_map.get(item['title'].lower().strip(), {})
+    poster_url = meta.get('poster_url')
+    logo_url = meta.get('logo_url')
+    netflix_id = meta.get('netflix_id')
+    local_title = fetch_local_title(netflix_id, cc) if netflix_id else None
+
+    show_title = meta.get('show_title') or item.get('show_title')
+    season_title = meta.get('season_title') or item.get('season_title')
+    synopsis = meta.get('synopsis')
+    maturity_rating = meta.get('maturity_rating')
+    runtime_seconds = meta.get('runtime_seconds') or item.get('runtime_seconds')
+
+    media_item_id = upsert_media_item(
+        db_path,
+        title=item['title'],
+        type=item['type'],
+        release_year=item['release_year'],
+        season_name=item['season_name'],
+        folder_name=item['folder_name'],
+        local_title=local_title,
+        netflix_id=netflix_id,
+        show_title=show_title,
+        season_title=season_title,
+        synopsis=synopsis,
+        maturity_rating=maturity_rating,
+        runtime_seconds=runtime_seconds,
+        logo_url=logo_url,
+        poster_url=poster_url
+    )
+
+    insert_ranking(
+        db_path,
+        country_code=item['country_code'],
+        country_name=item.get('country_name', 'Global' if cc == 'GLOBAL' else cc),
+        category=item['category'],
+        rank=item['rank'],
+        week=latest_week,
+        media_item_id=media_item_id,
+        weekly_hours_viewed=item['hours'],
+        weekly_views=item['views'],
+        cumulative_weeks_in_top_10=item['cumulative_weeks']
+    )
+
 def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: int = 0):
     """Crawl, parse, and synchronize NetPlex rankings with Netflix Top 10 portal."""
+    start_time = time.time()
     countries_config = get_monitored_countries(db_path)
+    num_regions = len(countries_config) if countries_config else 0
+    logger.info(f"Fetching regions & found {num_regions} regions")
+
     if not countries_config:
         return
         
@@ -321,10 +374,10 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
     global_config = [c for c in countries_config if c['country_code'].upper() == 'GLOBAL']
     country_configs = [c for c in countries_config if c['country_code'].upper() != 'GLOBAL']
     
-    metadata_cache = {}
-    current_task = current_task_start
-    
-    # Process Global rankings
+    parsed_items_by_country = {}
+    latest_week_by_country = {}
+
+    # Download & parse Global rankings if configured
     if global_config:
         set_crawl_progress(0, total_tasks, "Fetching Global Top 10 rankings")
         global_url = "https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv"
@@ -334,56 +387,10 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
         latest_week = get_latest_available_week(global_path)
         if latest_week:
             parsed_data = parse_top10_data(global_path, global_config, latest_week)
-            meta_map = fetch_country_top10_metadata('GLOBAL')
+            parsed_items_by_country['GLOBAL'] = parsed_data
+            latest_week_by_country['GLOBAL'] = latest_week
             
-            # Clear rankings only for GLOBAL and target week atomically right before insertion
-            clear_rankings_for_country_and_week(db_path, 'GLOBAL', latest_week)
-            
-            for item in parsed_data:
-                meta = meta_map.get(item['title'].lower().strip(), {})
-                poster_url = meta.get('poster_url')
-                logo_url = meta.get('logo_url')
-                netflix_id = meta.get('netflix_id')
-                local_title = fetch_local_title(netflix_id, 'GLOBAL') if netflix_id else None
-
-                show_title = meta.get('show_title') or item.get('show_title')
-                season_title = meta.get('season_title') or item.get('season_title')
-                synopsis = meta.get('synopsis')
-                maturity_rating = meta.get('maturity_rating')
-                runtime_seconds = meta.get('runtime_seconds') or item.get('runtime_seconds')
-
-                media_item_id = upsert_media_item(
-                    db_path,
-                    title=item['title'],
-                    type=item['type'],
-                    release_year=item['release_year'],
-                    season_name=item['season_name'],
-                    folder_name=item['folder_name'],
-                    local_title=local_title,
-                    netflix_id=netflix_id,
-                    show_title=show_title,
-                    season_title=season_title,
-                    synopsis=synopsis,
-                    maturity_rating=maturity_rating,
-                    runtime_seconds=runtime_seconds,
-                    logo_url=logo_url,
-                    poster_url=poster_url
-                )
-
-                insert_ranking(
-                    db_path,
-                    country_code=item['country_code'],
-                    country_name=item.get('country_name', 'Global'),
-                    category=item['category'],
-                    rank=item['rank'],
-                    week=latest_week,
-                    media_item_id=media_item_id,
-                    weekly_hours_viewed=item['hours'],
-                    weekly_views=item['views'],
-                    cumulative_weeks_in_top_10=item['cumulative_weeks']
-                )
-                
-    # Process Country rankings
+    # Download & parse Country rankings if configured
     if country_configs:
         countries_url = "https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv"
         countries_path = os.path.join(cache_dir, "all-weeks-countries.tsv")
@@ -392,66 +399,81 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
         latest_week = get_latest_available_week(countries_path)
         if latest_week:
             parsed_data = parse_top10_data(countries_path, country_configs, latest_week)
-            
-            # Group parsed items by country_code to update each country atomically
-            country_groups = {}
             for item in parsed_data:
-                cc = item['country_code']
-                country_groups.setdefault(cc, []).append(item)
-                
-            for cc, items in country_groups.items():
-                set_crawl_progress(0, total_tasks, f"Fetching Top 10 rankings for {cc}")
+                cc = item['country_code'].upper()
+                parsed_items_by_country.setdefault(cc, []).append(item)
+                latest_week_by_country[cc] = latest_week
 
-                if cc not in metadata_cache:
-                    metadata_cache[cc] = fetch_country_top10_metadata(cc)
-                meta_map = metadata_cache[cc]
-                
-                # Clear rankings specifically for this country and target week right before inserting
-                clear_rankings_for_country_and_week(db_path, cc, latest_week)
+    metadata_cache = {}
+    current_task = current_task_start
+    total_regions_processed = 0
+    total_movies_crawled = 0
+    total_tv_crawled = 0
+    total_rankings_synchronized = 0
 
-                for item in items:
-                    meta = meta_map.get(item['title'].lower().strip(), {})
-                    poster_url = meta.get('poster_url')
-                    logo_url = meta.get('logo_url')
-                    netflix_id = meta.get('netflix_id')
-                    local_title = fetch_local_title(netflix_id, cc) if netflix_id else None
+    for config in countries_config:
+        cc = config['country_code'].upper()
+        formats = config.get('formats', 'both')
+        
+        # Determine content types string
+        if formats in ['movies', 'movie']:
+            content_types = ["Movies"]
+        elif formats in ['tv']:
+            content_types = ["TV Shows"]
+        else:
+            content_types = ["Movies", "TV Shows"]
 
-                    show_title = meta.get('show_title') or item.get('show_title')
-                    season_title = meta.get('season_title') or item.get('season_title')
-                    synopsis = meta.get('synopsis')
-                    maturity_rating = meta.get('maturity_rating')
-                    runtime_seconds = meta.get('runtime_seconds') or item.get('runtime_seconds')
+        content_types_str = ", ".join(content_types)
 
-                    media_item_id = upsert_media_item(
-                        db_path,
-                        title=item['title'],
-                        type=item['type'],
-                        release_year=item['release_year'],
-                        season_name=item['season_name'],
-                        folder_name=item['folder_name'],
-                        local_title=local_title,
-                        netflix_id=netflix_id,
-                        show_title=show_title,
-                        season_title=season_title,
-                        synopsis=synopsis,
-                        maturity_rating=maturity_rating,
-                        runtime_seconds=runtime_seconds,
-                        logo_url=logo_url,
-                        poster_url=poster_url
-                    )
+        logger.info(f"fetching {cc}")
+        logger.info(f"Content types of {cc}: {content_types_str}")
+        set_crawl_progress(current_task, total_tasks, f"Fetching Top 10 rankings for {cc}")
 
-                    insert_ranking(
-                        db_path,
-                        country_code=item['country_code'],
-                        country_name=item.get('country_name'),
-                        category=item['category'],
-                        rank=item['rank'],
-                        week=latest_week,
-                        media_item_id=media_item_id,
-                        weekly_hours_viewed=item['hours'],
-                        weekly_views=item['views'],
-                        cumulative_weeks_in_top_10=item['cumulative_weeks']
-                    )
-                current_task += 1
+        items = parsed_items_by_country.get(cc, [])
+        latest_week = latest_week_by_country.get(cc)
+
+        if not items or not latest_week:
+            current_task += 1
+            total_regions_processed += 1
+            continue
+
+        if cc not in metadata_cache:
+            metadata_cache[cc] = fetch_country_top10_metadata(cc)
+        meta_map = metadata_cache[cc]
+
+        # Clear rankings specifically for this country and target week right before inserting
+        clear_rankings_for_country_and_week(db_path, cc, latest_week)
+
+        # Split items into Movies and TV Shows
+        movies = [item for item in items if item['category'] == 'Movies']
+        tv_shows = [item for item in items if item['category'] == 'TV']
+
+        if "Movies" in content_types and movies:
+            logger.info("Fetching Movies")
+            for item in movies:
+                logger.info(f"Fetching {item['title']}")
+                _save_crawled_item(db_path, item, cc, latest_week, meta_map)
+                total_movies_crawled += 1
+                total_rankings_synchronized += 1
+
+        if "TV Shows" in content_types and tv_shows:
+            logger.info("Fetching TV Shows")
+            for item in tv_shows:
+                logger.info(f"Fetching {item['title']}")
+                _save_crawled_item(db_path, item, cc, latest_week, meta_map)
+                total_tv_crawled += 1
+                total_rankings_synchronized += 1
+
+        current_task += 1
+        total_regions_processed += 1
+
+    elapsed_seconds = time.time() - start_time
+    logger.info("Summary of Crawling:")
+    logger.info(f"  - Total Regions Processed: {total_regions_processed}")
+    logger.info(f"  - Total Movies Crawled: {total_movies_crawled}")
+    logger.info(f"  - Total TV Shows Crawled: {total_tv_crawled}")
+    logger.info(f"  - Total Rankings Synchronized: {total_rankings_synchronized}")
+    logger.info(f"  - Elapsed Time: {elapsed_seconds:.2f}s")
+
 
 
