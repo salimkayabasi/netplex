@@ -43,7 +43,8 @@ def test_post_settings_json(client_and_db):
     payload = {
         "plex_url": "http://192.168.1.100:32400",
         "plex_token": "secret_token_123",
-        "update_interval_hours": "48",
+        "cron_expression": "0 12 * * 1",
+        "dummy_media_mode": True,
         "trailer_subtitles": True,
         "subtitle_languages": "en,de,tr",
         "log_level": "DEBUG",
@@ -60,7 +61,8 @@ def test_post_settings_json(client_and_db):
     
     assert get_setting(db_path, "plex_url") == "http://192.168.1.100:32400"
     assert get_setting(db_path, "plex_token") == "secret_token_123"
-    assert get_setting(db_path, "update_interval_hours") == "48"
+    assert get_setting(db_path, "cron_expression") == "0 12 * * 1"
+    assert get_setting(db_path, "dummy_media_mode") == "true"
     assert get_setting(db_path, "trailer_subtitles") == "true"
     assert get_setting(db_path, "subtitle_languages") == "en,de,tr"
     assert get_setting(db_path, "log_level") == "DEBUG"
@@ -75,7 +77,7 @@ def test_post_settings_form(client_and_db):
     form_data = {
         "plex_url": "http://localhost:32400",
         "plex_token": "form_token",
-        "update_interval_hours": "24",
+        "cron_expression": "0 0 * * *",
         "trailer_subtitles": "true",
         "subtitle_languages": "en",
         "log_level": "INFO",
@@ -89,7 +91,7 @@ def test_post_settings_form(client_and_db):
     assert resp.status_code == 303
     
     assert get_setting(db_path, "plex_token") == "form_token"
-    assert get_setting(db_path, "update_interval_hours") == "24"
+    assert get_setting(db_path, "cron_expression") == "0 0 * * *"
 
 def test_plex_pin_initiation(client_and_db):
     client, db_path, _, _ = client_and_db

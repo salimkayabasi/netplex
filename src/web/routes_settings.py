@@ -93,13 +93,16 @@ async def parse_form_data(request: Request) -> dict[str, list[str]]:
         parsed = urllib.parse.parse_qs(body.decode("utf-8"))
         return parsed
 
+from croniter import croniter
+
 @router.get("/settings", response_class=HTMLResponse)
 def get_settings_page(request: Request):
     db_path = get_db_path(request)
     
     plex_url = get_setting(db_path, "plex_url", "http://localhost:32400")
     plex_token = get_setting(db_path, "plex_token", "")
-    update_interval = get_setting(db_path, "update_interval_hours", "168")
+    cron_expression = get_setting(db_path, "cron_expression", "0 0 * * 2")
+    dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
     trailer_subtitles = get_setting(db_path, "trailer_subtitles", "false").lower() in ("true", "1", "yes", "on")
     subtitle_languages = get_setting(db_path, "subtitle_languages", "en")
     log_level = get_setting(db_path, "log_level", "INFO")
@@ -131,7 +134,8 @@ def get_settings_page(request: Request):
         context={
             "plex_url": plex_url,
             "plex_token": plex_token,
-            "update_interval": update_interval,
+            "cron_expression": cron_expression,
+            "dummy_media_mode": dummy_media_mode,
             "trailer_subtitles": trailer_subtitles,
             "subtitle_languages": subtitle_languages,
             "log_level": log_level,
@@ -152,7 +156,8 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
         data = await request.json()
         plex_url = data.get("plex_url")
         plex_token = data.get("plex_token")
-        update_interval_hours = data.get("update_interval_hours")
+        cron_expression = data.get("cron_expression")
+        dummy_media_mode = data.get("dummy_media_mode")
         trailer_subtitles = data.get("trailer_subtitles")
         subtitle_languages = data.get("subtitle_languages")
         log_level = data.get("log_level")
@@ -161,7 +166,8 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
         form_dict = await parse_form_data(request)
         plex_url = form_dict.get("plex_url", [None])[0]
         plex_token = form_dict.get("plex_token", [None])[0]
-        update_interval_hours = form_dict.get("update_interval_hours", [None])[0]
+        cron_expression = form_dict.get("cron_expression", [None])[0]
+        dummy_media_mode = form_dict.get("dummy_media_mode", [None])[0]
         trailer_subtitles = form_dict.get("trailer_subtitles", [None])[0]
         subtitle_languages = form_dict.get("subtitle_languages", [None])[0]
         log_level = form_dict.get("log_level", [None])[0]
@@ -179,12 +185,18 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
             fmt_str = ",".join(fmt_parts) if fmt_parts else "movie,tv"
             monitored_countries.append({"country_code": code, "formats": fmt_str})
 
+    if cron_expression is not None:
+        if not croniter.is_valid(str(cron_expression)):
+            raise HTTPException(status_code=400, detail="Invalid cron expression")
+        set_setting(db_path, "cron_expression", str(cron_expression))
+
     if plex_url is not None:
         set_setting(db_path, "plex_url", str(plex_url))
     if plex_token is not None:
         set_setting(db_path, "plex_token", str(plex_token))
-    if update_interval_hours is not None:
-        set_setting(db_path, "update_interval_hours", str(update_interval_hours))
+    if dummy_media_mode is not None:
+        val = "true" if str(dummy_media_mode).lower() in ("true", "1", "on", "yes") else "false"
+        set_setting(db_path, "dummy_media_mode", val)
     if trailer_subtitles is not None:
         val = "true" if str(trailer_subtitles).lower() in ("true", "1", "on", "yes") else "false"
         set_setting(db_path, "trailer_subtitles", val)
@@ -192,6 +204,7 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
         set_setting(db_path, "subtitle_languages", str(subtitle_languages))
     if log_level is not None:
         set_setting(db_path, "log_level", str(log_level))
+
 
     region_changed = False
     if monitored_countries is not None:

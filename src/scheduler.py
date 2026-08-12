@@ -91,8 +91,10 @@ def run_full_sync_pipeline(db_path: str) -> dict:
     finally:
         release_crawl_lock()
 
+from croniter import croniter
+
 def should_run_sync(db_path: str) -> bool:
-    """Determines whether a sync pipeline execution is due based on DB timestamp and interval."""
+    """Determines whether a sync pipeline execution is due based on DB timestamp and cron schedule."""
     last_crawl = get_setting(db_path, "last_crawl_timestamp")
     if not last_crawl:
         return True
@@ -101,14 +103,20 @@ def should_run_sync(db_path: str) -> bool:
         if last_dt.tzinfo is None:
             last_dt = last_dt.replace(tzinfo=timezone.utc)
             
-        interval_str = get_setting(db_path, "update_interval_hours", "168")
-        interval_hours = float(interval_str)
-        
+        cron_expr = get_setting(db_path, "cron_expression", "0 0 * * 2")
+        if not croniter.is_valid(cron_expr):
+            logger.warning(f"Invalid cron_expression '{cron_expr}', falling back to default '0 0 * * 2'")
+            cron_expr = "0 0 * * 2"
+
         now = datetime.now(timezone.utc)
-        elapsed_seconds = (now - last_dt).total_seconds()
-        return elapsed_seconds >= interval_hours * 3600
+        cron_iter = croniter(cron_expr, last_dt)
+        next_run = cron_iter.get_next(datetime)
+        if next_run.tzinfo is None:
+            next_run = next_run.replace(tzinfo=timezone.utc)
+            
+        return now >= next_run
     except Exception as e:
-        logger.error(f"Error parsing sync timestamp or interval: {e}")
+        logger.error(f"Error parsing sync timestamp or cron schedule: {e}")
         return True
 
 def handle_shutdown_signal(signum, frame):

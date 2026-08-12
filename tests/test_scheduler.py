@@ -134,9 +134,9 @@ def test_should_run_sync_recently_run(tmp_path):
     db_path = str(tmp_path / "test.db")
     init_db(db_path)
     
-    recent_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    recent_ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     set_setting(db_path, "last_crawl_timestamp", recent_ts)
-    set_setting(db_path, "update_interval_hours", "24")
+    set_setting(db_path, "cron_expression", "0 0 * * 2")
     
     assert should_run_sync(db_path) is False
 
@@ -144,9 +144,9 @@ def test_should_run_sync_due(tmp_path):
     db_path = str(tmp_path / "test.db")
     init_db(db_path)
     
-    past_ts = (datetime.now(timezone.utc) - timedelta(hours=30)).isoformat()
+    past_ts = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
     set_setting(db_path, "last_crawl_timestamp", past_ts)
-    set_setting(db_path, "update_interval_hours", "24")
+    set_setting(db_path, "cron_expression", "0 0 * * 2")
     
     assert should_run_sync(db_path) is True
 

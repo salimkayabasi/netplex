@@ -63,11 +63,19 @@
         
         <form id="preferences-form" onsubmit="event.preventDefault(); return false;">
             <div style="margin-bottom: 1rem;">
-                <label for="update_interval_hours" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
-                    Update Interval (Hours)
+                <label for="cron_expression" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">
+                    Cron Schedule Expression (5-field)
                 </label>
-                <input type="number" id="update_interval_hours" name="update_interval_hours" value="{{ update_interval }}" min="1" max="720" required
+                <input type="text" id="cron_expression" name="cron_expression" value="{{ cron_expression }}" placeholder="0 0 * * 2" required
                        style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.95rem;">
+            </div>
+
+            <div style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+                <input type="checkbox" id="dummy_media_mode" name="dummy_media_mode" value="true" {% if dummy_media_mode %}checked{% endif %}
+                       style="width: 18px; height: 18px; accent-color: var(--netflix-red); cursor: pointer;">
+                <label for="dummy_media_mode" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+                    Dummy (Zero-Byte) Trailer Mode (Media Stubs)
+                </label>
             </div>
 
             <div style="margin-bottom: 1rem;">
@@ -314,12 +322,14 @@ const savePlexDebounced = createDebouncedSaver(() => {
 });
 
 const savePrefsDebounced = createDebouncedSaver(() => {
-    const update_interval_hours = document.getElementById('update_interval_hours').value;
+    const cron_expression = document.getElementById('cron_expression').value;
+    const dummy_media_mode = document.getElementById('dummy_media_mode').checked;
     const subtitle_languages = document.getElementById('subtitle_languages').value;
     const trailer_subtitles = document.getElementById('trailer_subtitles').checked;
     const log_level = document.getElementById('log_level').value;
     autoSaveSettings({
-        update_interval_hours,
+        cron_expression,
+        dummy_media_mode,
         subtitle_languages,
         trailer_subtitles,
         log_level
@@ -459,23 +469,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Preferences inputs
-    const intervalEl = document.getElementById('update_interval_hours');
+    const cronExprEl = document.getElementById('cron_expression');
+    const dummyModeEl = document.getElementById('dummy_media_mode');
     const subLangEl = document.getElementById('subtitle_languages');
     const trailerSubEl = document.getElementById('trailer_subtitles');
     const logLevelEl = document.getElementById('log_level');
 
     const triggerPrefsSave = () => {
         autoSaveSettings({
-            update_interval_hours: intervalEl ? intervalEl.value : "168",
+            cron_expression: cronExprEl ? cronExprEl.value : "0 0 * * 2",
+            dummy_media_mode: dummyModeEl ? dummyModeEl.checked : false,
             subtitle_languages: subLangEl ? subLangEl.value : "en",
             trailer_subtitles: trailerSubEl ? trailerSubEl.checked : false,
             log_level: logLevelEl ? logLevelEl.value : "INFO"
         });
     };
 
-    if (intervalEl) {
-        intervalEl.addEventListener('input', savePrefsDebounced);
-        intervalEl.addEventListener('change', triggerPrefsSave);
+    if (cronExprEl) {
+        cronExprEl.addEventListener('input', savePrefsDebounced);
+        cronExprEl.addEventListener('change', triggerPrefsSave);
+    }
+    if (dummyModeEl) {
+        dummyModeEl.addEventListener('change', triggerPrefsSave);
     }
     if (subLangEl) {
         subLangEl.addEventListener('input', savePrefsDebounced);
