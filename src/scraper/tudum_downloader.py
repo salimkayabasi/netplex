@@ -236,9 +236,10 @@ def search_and_download_youtube_trailer(
     ]
     
     yt_url = None
+    matched_entry = None
     for query in queries:
         try:
-            logger.info(f"  ├─ Searching YouTube via yt-dlp: {query}")
+            logger.info(f"  ├─ Searching YouTube via yt-dlp with query: {query}")
             search_opts = {
                 'quiet': True,
                 'no_warnings': True,
@@ -254,7 +255,16 @@ def search_and_download_youtube_trailer(
                         if not yt_url and entry.get('id'):
                             yt_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
                         if yt_url:
-                            logger.info(f"  ├─ Found YouTube video URL: {yt_url}")
+                            matched_entry = entry
+                            v_title = entry.get('title', 'Unknown Title')
+                            v_uploader = entry.get('uploader') or entry.get('channel', 'Unknown Channel')
+                            v_duration = entry.get('duration')
+                            duration_str = f"{v_duration}s" if v_duration else "N/A"
+                            logger.info(f"  ├─ YouTube match found:")
+                            logger.info(f"  │   ├─ Title: '{v_title}'")
+                            logger.info(f"  │   ├─ Channel: '{v_uploader}'")
+                            logger.info(f"  │   ├─ Duration: {duration_str}")
+                            logger.info(f"  │   └─ URL: {yt_url}")
                             break
         except Exception as e:
             logger.warning(f"  ├─ YouTube search query failed for '{query}': {e}")
@@ -263,15 +273,25 @@ def search_and_download_youtube_trailer(
         logger.warning(f"  ├─ No YouTube trailer found for '{title}'")
         return None
 
+    format_spec = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
     try:
-        logger.info(f"  ├─ Downloading YouTube video via yt-dlp: {yt_url} -> {output_path}")
+        logger.info(f"  ├─ Starting yt-dlp video download:")
+        logger.info(f"  │   ├─ Target URL: {yt_url}")
+        logger.info(f"  │   ├─ Format Spec: '{format_spec}'")
+        logger.info(f"  │   ├─ Output Path: {output_path}")
+        if fetch_subtitles:
+            sub_lang = subtitle_langs[0] if subtitle_langs else "en"
+            logger.info(f"  │   └─ Subtitles: Enabled (Language: {sub_lang}, Format: SRT via FFmpeg)")
+        else:
+            logger.info(f"  │   └─ Subtitles: Disabled")
+
         ydl_opts = {
             'outtmpl': output_path,
             'quiet': True,
             'no_warnings': True,
             'noprogress': True,
             'overwrites': True,
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': format_spec,
         }
         if fetch_subtitles:
             sub_lang = subtitle_langs[0] if subtitle_langs else "en"
@@ -287,7 +307,13 @@ def search_and_download_youtube_trailer(
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([yt_url])
         
-        return yt_url
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            logger.info(f"  ├─ yt-dlp download completed successfully ({file_size_mb:.2f} MB saved)")
+            return yt_url
+        else:
+            logger.warning(f"  ├─ Downloaded file {output_path} is missing or 0 bytes after yt-dlp execution.")
+            return None
     except Exception as e:
         logger.error(f"  ├─ yt-dlp download failed for '{yt_url}': {e}")
         return None
@@ -479,9 +505,8 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 if yt_url:
                     update_media_item_tudum_metadata(db_path, item['id'], youtube_url=yt_url)
                 else:
-                    logger.warning(f"  └─ YouTube trailer download failed for '{item['title']}'. Marking status as 'failed'.")
-                    update_media_item_status(db_path, item['id'], 'failed')
-                    continue
+                    logger.warning(f"  ├─ YouTube trailer download via yt-dlp failed or no video found for '{item['title']}'. Creating zero-byte placeholder file at {video_path}")
+                    open(video_path, 'wb').close()
             
             # Generate and Write NFO metadata
             try:

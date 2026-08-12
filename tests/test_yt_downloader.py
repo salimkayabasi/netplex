@@ -151,7 +151,7 @@ def test_download_pending_trailers_yt_download_success(mock_extract, mock_find, 
 @patch("src.scraper.tudum_downloader.search_and_download_youtube_trailer")
 @patch("src.scraper.tudum_downloader.find_tudum_page")
 @patch("src.scraper.tudum_downloader.extract_trailer_assets")
-def test_download_pending_trailers_yt_download_failure_marks_failed(mock_extract, mock_find, mock_yt_search, initialized_db, tmp_path):
+def test_download_pending_trailers_yt_download_failure_creates_stub(mock_extract, mock_find, mock_yt_search, initialized_db, tmp_path):
     conn = _get_connection(initialized_db)
     with conn:
         conn.execute("""
@@ -166,11 +166,17 @@ def test_download_pending_trailers_yt_download_failure_marks_failed(mock_extract
     media_dir = tmp_path / "media"
     download_pending_trailers(initialized_db, media_dir=str(media_dir))
 
+    # Verify zero-byte placeholder stub created
+    stub_file = media_dir / "movies" / "Failed Film (2026)" / "Failed Film (2026).mp4"
+    assert stub_file.exists()
+    assert stub_file.stat().st_size == 0
+
     conn = _get_connection(initialized_db)
-    row = conn.execute("SELECT status FROM media_items WHERE title = 'Failed Film'").fetchone()
+    row = conn.execute("SELECT status, file_path FROM media_items WHERE title = 'Failed Film'").fetchone()
     conn.close()
 
-    assert row["status"] == "failed"
+    assert row["status"] == "downloaded"
+    assert row["file_path"] == str(stub_file)
 
 
 def test_download_pending_trailers_dummy_mode_stub_creation(initialized_db, tmp_path):

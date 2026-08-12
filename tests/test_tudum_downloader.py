@@ -223,8 +223,8 @@ def test_download_pending_trailers_success(mock_yt_search, mock_extract, mock_fi
 
 @patch('src.scraper.tudum_downloader.find_tudum_page')
 @patch('src.scraper.tudum_downloader.extract_trailer_assets')
-@patch('src.scraper.tudum_downloader.download_file')
-def test_download_pending_trailers_failure(mock_download, mock_extract, mock_find, initialized_db, tmp_path):
+@patch('src.scraper.tudum_downloader.search_and_download_youtube_trailer')
+def test_download_pending_trailers_failure_fallback_stub(mock_yt_search, mock_extract, mock_find, initialized_db, tmp_path):
     conn = _get_connection(initialized_db)
     with conn:
         conn.execute("""
@@ -235,19 +235,26 @@ def test_download_pending_trailers_failure(mock_download, mock_extract, mock_fin
     # Mock extract to return no video url (failed extraction)
     mock_find.return_value = "https://www.netflix.com/tudum/failure"
     mock_extract.return_value = {"video_url": None, "subtitle_url": None}
+    mock_yt_search.return_value = None
 
     media_dir = tmp_path / "media"
     
     # Run the pipeline
     download_pending_trailers(initialized_db, media_dir=str(media_dir))
 
-    # Verify status is marked as failed
+    # Verify zero-byte placeholder stub created
+    stub_file = media_dir / "tv" / "Failure Show (2026)" / "Season 01" / "S01E00 - Trailer.mp4"
+    assert stub_file.exists()
+    assert stub_file.stat().st_size == 0
+
+    # Verify status is marked as downloaded with stub file path
     conn = _get_connection(initialized_db)
-    cursor = conn.execute("SELECT status FROM media_items WHERE title = 'Failure Show'")
-    status = cursor.fetchone()["status"]
+    cursor = conn.execute("SELECT status, file_path FROM media_items WHERE title = 'Failure Show'")
+    row = cursor.fetchone()
     conn.close()
 
-    assert status == "failed"
+    assert row["status"] == "downloaded"
+    assert row["file_path"] == str(stub_file)
 
 @patch('src.scraper.tudum_downloader.find_tudum_page')
 @patch('src.scraper.tudum_downloader.extract_trailer_assets')
