@@ -132,7 +132,7 @@ def test_crawl_netflix_top10(mock_fetch, mock_local_title, initialized_db):
     set_monitored_country(initialized_db, "AR", "tv")
 
     # Side-effect to copy local fixtures to the temporary cache path
-    def copy_fixture(url, cache_path):
+    def copy_fixture(url, cache_path, *args, **kwargs):
         if "global" in url:
             shutil.copy("tests/fixtures/all-weeks-global.tsv", cache_path)
         else:
@@ -172,7 +172,7 @@ def test_crawl_logging(mock_fetch, mock_local_title, initialized_db, caplog):
     set_monitored_country(initialized_db, "GLOBAL", "both")
     set_monitored_country(initialized_db, "AR", "tv")
 
-    def copy_fixture(url, cache_path):
+    def copy_fixture(url, cache_path, *args, **kwargs):
         if "global" in url:
             shutil.copy("tests/fixtures/all-weeks-global.tsv", cache_path)
         else:

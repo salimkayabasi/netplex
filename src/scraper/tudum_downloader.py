@@ -17,10 +17,9 @@ from src.metadata.nfo_generator import (
     write_nfo_file
 )
 
-import urllib.parse
-import urllib.error
+from src.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("netplex.downloader")
 
 def make_slug(title: str) -> str:
     """Formats a title into a clean slug (lowercase, dashes instead of spaces, removes special characters)."""
@@ -199,6 +198,7 @@ def download_file(url: str, output_path: str):
     clean_url = sanitize_url(url)
     try:
         import yt_dlp
+        logger.info(f"  ├─ Downloading video stream via yt-dlp: {clean_url}")
         ydl_opts = {
             'outtmpl': output_path,
             'quiet': True,
@@ -209,7 +209,7 @@ def download_file(url: str, output_path: str):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([clean_url])
     except Exception as e:
-        logger.warning(f"yt-dlp download failed for {clean_url}: {e}, falling back to urllib stream download")
+        logger.warning(f"  ├─ yt-dlp download failed for {clean_url}: {e}, falling back to urllib stream download")
         req = urllib.request.Request(clean_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=15) as response, open(output_path, 'wb') as out_file:
             while True:
@@ -330,12 +330,24 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
     for idx, item in enumerate(items):
         current_task = idx + 1
         set_crawl_progress(current_task, total_count, f"Downloading trailer: {item['title']}")
-        logger.info(f"Processing trailer download for: {item['title']}")
+        logger.info(f"Processing trailer for '{item['title']}' ({item['type'].upper()}, ID: {item['id']})")
 
         try:
+            logger.info(f"  ├─ Searching Netflix Tudum page for '{item['title']}'...")
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
+            if tudum_url:
+                logger.info(f"  ├─ Found Tudum page URL: {tudum_url}")
+            else:
+                logger.info(f"  ├─ No direct Tudum page found for '{item['title']}'. Checking fallback page.")
+                
+            logger.info(f"  ├─ Scraping trailer video stream and metadata from Tudum page...")
             assets = extract_trailer_assets(tudum_url)
             
+            if assets.get("video_url"):
+                logger.info(f"  ├─ Extracted video stream URL: {assets['video_url']}")
+            else:
+                logger.warning(f"  ├─ No video stream URL found for '{item['title']}' on Tudum page")
+                
             update_media_item_tudum_metadata(
                 db_path,
                 item['id'],
@@ -350,7 +362,7 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
             )
 
             if not assets["video_url"] and not dummy_media_mode:
-                logger.warning(f"No video URL found for {item['title']}. Marking as failed.")
+                logger.warning(f"  └─ No video stream available for '{item['title']}'. Marking status as 'failed'.")
                 update_media_item_status(db_path, item['id'], 'failed')
                 continue
                 
@@ -381,7 +393,7 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 
             # Download or create dummy video stub
             if dummy_media_mode:
-                logger.info(f"Dummy media mode: Creating zero-byte trailer stub for {item['title']} at {video_path}")
+                logger.info(f"  ├─ Dummy media mode enabled: Creating zero-byte trailer stub file at {video_path}")
                 open(video_path, 'wb').close()
             else:
                 download_file(assets["video_url"], video_path)
@@ -389,6 +401,7 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
             # Download Subtitle if enabled
             if trailer_subtitles and assets["subtitle_url"]:
                 try:
+                    logger.info(f"  ├─ Downloading WebVTT subtitles and converting to SRT at {sub_path}...")
                     req = urllib.request.Request(assets["subtitle_url"], headers={'User-Agent': 'Mozilla/5.0'})
                     with urllib.request.urlopen(req, timeout=10) as response:
                         vtt_content = response.read().decode('utf-8')
@@ -396,7 +409,7 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                     with open(sub_path, "w", encoding="utf-8") as sf:
                         sf.write(srt_content)
                 except Exception as sub_err:
-                    logger.error(f"Failed to download/convert subtitle for {item['title']}: {sub_err}")
+                    logger.error(f"  ├─ Failed to download/convert subtitle for {item['title']}: {sub_err}")
                     
             # Generate and Write NFO metadata
             try:
@@ -419,12 +432,13 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                     nfo_dir = os.path.join(media_dir, "movies", folder_name)
                     nfo_file = "movie.nfo"
                     
+                logger.info(f"  ├─ Generating and writing NFO metadata ({nfo_file}) at {nfo_dir}...")
                 write_nfo_file(nfo_dir, nfo_xml, nfo_file)
             except Exception as nfo_err:
-                logger.error(f"Failed to write NFO for {item['title']}: {nfo_err}")
+                logger.error(f"  ├─ Failed to write NFO for {item['title']}: {nfo_err}")
 
             update_media_item_status(db_path, item['id'], 'downloaded', file_path=video_path)
-            logger.info(f"Successfully downloaded trailer for {item['title']} to {video_path}")
+            logger.info(f"  └─ Successfully completed trailer download and metadata setup for '{item['title']}'")
             
         except Exception as e:
             logger.error(f"Failed to process trailer for {item['title']}: {e}", exc_info=True)

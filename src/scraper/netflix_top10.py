@@ -121,24 +121,38 @@ def fetch_local_title(netflix_id: int, country_code: str) -> str | None:
             return clean
     return None
 
-def fetch_top10_tsv(url: str, cache_path: str) -> str:
+def fetch_top10_tsv(url: str, cache_path: str, force_refresh: bool = False) -> str:
     """Stream-downloads the TSV dataset and caches it locally to avoid redundant downloads."""
     # Ensure directory exists
     cache_dir = os.path.dirname(os.path.abspath(cache_path))
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
         
-    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+    if not force_refresh and os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
         return cache_path
-        
+
+    tmp_path = cache_path + ".tmp"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-    with urllib.request.urlopen(req) as response, open(cache_path, 'wb') as out_file:
-        while True:
-            chunk = response.read(8192)
-            if not chunk:
-                break
-            out_file.write(chunk)
-            
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response, open(tmp_path, 'wb') as out_file:
+            while True:
+                chunk = response.read(8192)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            os.replace(tmp_path, cache_path)
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+            logger.warning(f"Failed to fetch updated TSV from {url}: {e}. Falling back to cached file.")
+            return cache_path
+        raise e
+
     return cache_path
 
 def get_latest_available_week(tsv_path: str) -> str:
@@ -314,7 +328,11 @@ def _save_crawled_item(db_path: str, item: dict, cc: str, latest_week: str, meta
     poster_url = meta.get('poster_url')
     logo_url = meta.get('logo_url')
     netflix_id = meta.get('netflix_id')
-    local_title = fetch_local_title(netflix_id, cc) if netflix_id else None
+    
+    local_title = None
+    if netflix_id:
+        logger.info(f"  └─ Scraping localized title from Netflix page for '{item['title']}' (Netflix ID: {netflix_id}, Region: {cc})")
+        local_title = fetch_local_title(netflix_id, cc)
 
     show_title = meta.get('show_title') or item.get('show_title')
     season_title = meta.get('season_title') or item.get('season_title')
@@ -352,6 +370,20 @@ def _save_crawled_item(db_path: str, item: dict, cc: str, latest_week: str, meta
         weekly_views=item['views'],
         cumulative_weeks_in_top_10=item['cumulative_weeks']
     )
+    logger.info(f"  └─ Synchronized ranking #{item['rank']:02d} for '{item['title']}' in DB (Region: {cc}, Week: {latest_week})")
+
+def cleanup_tsv_cache(cache_dir: str):
+    """Removes TSV files and temporary cache files from cache_dir."""
+    if not os.path.exists(cache_dir):
+        return
+    for filename in os.listdir(cache_dir):
+        if filename.endswith(".tsv") or filename.endswith(".tmp"):
+            file_path = os.path.join(cache_dir, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except OSError as e:
+                logger.warning(f"Failed to remove cached file {file_path}: {e}")
 
 def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: int = 0):
     """Crawl, parse, and synchronize NetPlex rankings with Netflix Top 10 portal."""
@@ -363,117 +395,124 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
     if not countries_config:
         return
         
-    # Resolve cache directory relative to database path
+    # Resolve cache directory relative to database path (not managed by env file)
     if db_path == ":memory:":
         cache_dir = "cache"
     else:
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), 'cache')
         
     os.makedirs(cache_dir, exist_ok=True)
-    
-    global_config = [c for c in countries_config if c['country_code'].upper() == 'GLOBAL']
-    country_configs = [c for c in countries_config if c['country_code'].upper() != 'GLOBAL']
-    
-    parsed_items_by_country = {}
-    latest_week_by_country = {}
 
-    # Download & parse Global rankings if configured
-    if global_config:
-        set_crawl_progress(0, total_tasks, "Fetching Global Top 10 rankings")
-        global_url = "https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv"
-        global_path = os.path.join(cache_dir, "all-weeks-global.tsv")
-        fetch_top10_tsv(global_url, global_path)
+    # On start of crawl, delete pre-existing TSV files first
+    cleanup_tsv_cache(cache_dir)
+    
+    try:
+        global_config = [c for c in countries_config if c['country_code'].upper() == 'GLOBAL']
+        country_configs = [c for c in countries_config if c['country_code'].upper() != 'GLOBAL']
         
-        latest_week = get_latest_available_week(global_path)
-        if latest_week:
-            parsed_data = parse_top10_data(global_path, global_config, latest_week)
-            parsed_items_by_country['GLOBAL'] = parsed_data
-            latest_week_by_country['GLOBAL'] = latest_week
+        parsed_items_by_country = {}
+        latest_week_by_country = {}
+
+        # Download & parse Global rankings if configured (always fetch fresh)
+        if global_config:
+            set_crawl_progress(0, total_tasks, "Fetching Global Top 10 rankings")
+            global_url = "https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv"
+            global_path = os.path.join(cache_dir, "all-weeks-global.tsv")
+            fetch_top10_tsv(global_url, global_path, force_refresh=True)
             
-    # Download & parse Country rankings if configured
-    if country_configs:
-        countries_url = "https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv"
-        countries_path = os.path.join(cache_dir, "all-weeks-countries.tsv")
-        fetch_top10_tsv(countries_url, countries_path)
-        
-        latest_week = get_latest_available_week(countries_path)
-        if latest_week:
-            parsed_data = parse_top10_data(countries_path, country_configs, latest_week)
-            for item in parsed_data:
-                cc = item['country_code'].upper()
-                parsed_items_by_country.setdefault(cc, []).append(item)
-                latest_week_by_country[cc] = latest_week
+            latest_week = get_latest_available_week(global_path)
+            if latest_week:
+                parsed_data = parse_top10_data(global_path, global_config, latest_week)
+                parsed_items_by_country['GLOBAL'] = parsed_data
+                latest_week_by_country['GLOBAL'] = latest_week
+                
+        # Download & parse Country rankings if configured (always fetch fresh)
+        if country_configs:
+            countries_url = "https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv"
+            countries_path = os.path.join(cache_dir, "all-weeks-countries.tsv")
+            fetch_top10_tsv(countries_url, countries_path, force_refresh=True)
+            
+            latest_week = get_latest_available_week(countries_path)
+            if latest_week:
+                parsed_data = parse_top10_data(countries_path, country_configs, latest_week)
+                for item in parsed_data:
+                    cc = item['country_code'].upper()
+                    parsed_items_by_country.setdefault(cc, []).append(item)
+                    latest_week_by_country[cc] = latest_week
 
-    metadata_cache = {}
-    current_task = current_task_start
-    total_regions_processed = 0
-    total_movies_crawled = 0
-    total_tv_crawled = 0
-    total_rankings_synchronized = 0
+        metadata_cache = {}
+        current_task = current_task_start
+        total_regions_processed = 0
+        total_movies_crawled = 0
+        total_tv_crawled = 0
+        total_rankings_synchronized = 0
 
-    for config in countries_config:
-        cc = config['country_code'].upper()
-        formats = config.get('formats', 'both')
-        
-        # Determine content types string
-        if formats in ['movies', 'movie']:
-            content_types = ["Movies"]
-        elif formats in ['tv']:
-            content_types = ["TV Shows"]
-        else:
-            content_types = ["Movies", "TV Shows"]
+        for config in countries_config:
+            cc = config['country_code'].upper()
+            formats = config.get('formats', 'both')
+            
+            # Determine content types string
+            if formats in ['movies', 'movie']:
+                content_types = ["Movies"]
+            elif formats in ['tv']:
+                content_types = ["TV Shows"]
+            else:
+                content_types = ["Movies", "TV Shows"]
 
-        content_types_str = ", ".join(content_types)
+            content_types_str = ", ".join(content_types)
 
-        logger.info(f"fetching {cc}")
-        logger.info(f"Content types of {cc}: {content_types_str}")
-        set_crawl_progress(current_task, total_tasks, f"Fetching Top 10 rankings for {cc}")
+            logger.info(f"fetching {cc}")
+            logger.info(f"Content types of {cc}: {content_types_str}")
+            set_crawl_progress(current_task, total_tasks, f"Fetching Top 10 rankings for {cc}")
 
-        items = parsed_items_by_country.get(cc, [])
-        latest_week = latest_week_by_country.get(cc)
+            items = parsed_items_by_country.get(cc, [])
+            latest_week = latest_week_by_country.get(cc)
 
-        if not items or not latest_week:
+            if not items or not latest_week:
+                current_task += 1
+                total_regions_processed += 1
+                continue
+
+            if cc not in metadata_cache:
+                metadata_cache[cc] = fetch_country_top10_metadata(cc)
+            meta_map = metadata_cache[cc]
+
+            # Clear rankings specifically for this country and target week right before inserting
+            clear_rankings_for_country_and_week(db_path, cc, latest_week)
+
+            # Split items into Movies and TV Shows
+            movies = [item for item in items if item['category'] == 'Movies']
+            tv_shows = [item for item in items if item['category'] == 'TV']
+
+            if "Movies" in content_types and movies:
+                logger.info("Fetching Movies")
+                for item in movies:
+                    logger.info(f"Fetching {item['title']}")
+                    _save_crawled_item(db_path, item, cc, latest_week, meta_map)
+                    total_movies_crawled += 1
+                    total_rankings_synchronized += 1
+
+            if "TV Shows" in content_types and tv_shows:
+                logger.info("Fetching TV Shows")
+                for item in tv_shows:
+                    logger.info(f"Fetching {item['title']}")
+                    _save_crawled_item(db_path, item, cc, latest_week, meta_map)
+                    total_tv_crawled += 1
+                    total_rankings_synchronized += 1
+
             current_task += 1
             total_regions_processed += 1
-            continue
 
-        if cc not in metadata_cache:
-            metadata_cache[cc] = fetch_country_top10_metadata(cc)
-        meta_map = metadata_cache[cc]
-
-        # Clear rankings specifically for this country and target week right before inserting
-        clear_rankings_for_country_and_week(db_path, cc, latest_week)
-
-        # Split items into Movies and TV Shows
-        movies = [item for item in items if item['category'] == 'Movies']
-        tv_shows = [item for item in items if item['category'] == 'TV']
-
-        if "Movies" in content_types and movies:
-            logger.info("Fetching Movies")
-            for item in movies:
-                logger.info(f"Fetching {item['title']}")
-                _save_crawled_item(db_path, item, cc, latest_week, meta_map)
-                total_movies_crawled += 1
-                total_rankings_synchronized += 1
-
-        if "TV Shows" in content_types and tv_shows:
-            logger.info("Fetching TV Shows")
-            for item in tv_shows:
-                logger.info(f"Fetching {item['title']}")
-                _save_crawled_item(db_path, item, cc, latest_week, meta_map)
-                total_tv_crawled += 1
-                total_rankings_synchronized += 1
-
-        current_task += 1
-        total_regions_processed += 1
-
-    elapsed_seconds = time.time() - start_time
-    logger.info("Summary of Crawling:")
-    logger.info(f"  - Total Regions Processed: {total_regions_processed}")
-    logger.info(f"  - Total Movies Crawled: {total_movies_crawled}")
-    logger.info(f"  - Total TV Shows Crawled: {total_tv_crawled}")
-    logger.info(f"  - Total Rankings Synchronized: {total_rankings_synchronized}")
-    logger.info(f"  - Elapsed Time: {elapsed_seconds:.2f}s")
+        elapsed_seconds = time.time() - start_time
+        logger.info("Summary of Crawling:")
+        logger.info(f"  - Total Regions Processed: {total_regions_processed}")
+        logger.info(f"  - Total Movies Crawled: {total_movies_crawled}")
+        logger.info(f"  - Total TV Shows Crawled: {total_tv_crawled}")
+        logger.info(f"  - Total Rankings Synchronized: {total_rankings_synchronized}")
+        logger.info(f"  - Elapsed Time: {elapsed_seconds:.2f}s")
+    finally:
+        # Once crawling is done (or failed), remove cached TSV files
+        cleanup_tsv_cache(cache_dir)
 
 
 
