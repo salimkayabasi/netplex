@@ -12,6 +12,7 @@ from src.database import (
     reset_stubs_and_failed_media_items
 )
 from src.scraper.tudum_downloader import (
+    score_trailer_candidate,
     search_and_download_youtube_trailer,
     download_pending_trailers,
     extract_trailer_assets
@@ -72,7 +73,9 @@ def test_search_and_download_youtube_trailer_fallback_query(mock_ytdl_cls, tmp_p
     # First search query fails (no entries), second search query succeeds
     mock_ydl.extract_info.side_effect = [
         {"entries": []},
-        {"entries": [{"id": "fallback123", "webpage_url": "https://www.youtube.com/watch?v=fallback123"}]}
+        {"entries": [{"id": "fallback123", "webpage_url": "https://www.youtube.com/watch?v=fallback123", "title": "Fallback Film Official Trailer"}]},
+        {"entries": []},
+        {"entries": []}
     ]
 
     out_file = tmp_path / "trailer.mp4"
@@ -240,3 +243,46 @@ def test_reset_stubs_and_failed_media_items(initialized_db, tmp_path):
     assert status_map[id1] == "pending"
     assert status_map[id2] == "pending"
     assert status_map[id3] == "downloaded"
+
+
+def test_score_trailer_candidate_filters_iphone_max_promo():
+    # Searching for movie "Max" (2015)
+    iphone_promo = {
+        "title": "iPhone 15 Pro Max Official Trailer",
+        "uploader": "Apple",
+        "duration": 180
+    }
+    real_trailer = {
+        "title": "MAX | Official Trailer | Warner Bros. Entertainment",
+        "uploader": "Warner Bros. Entertainment",
+        "description": "Max movie official trailer 2015",
+        "duration": 150
+    }
+
+    iphone_score = score_trailer_candidate(iphone_promo, "Max", 2015)
+    real_score = score_trailer_candidate(real_trailer, "Max", 2015)
+
+    assert iphone_score < 25.0
+    assert real_score >= 50.0
+
+
+def test_score_trailer_candidate_filters_generic_happy_content():
+    # Searching for movie "Are We Happy?" (2024)
+    vlog = {
+        "title": "10 Ways To Be Happy in Life - Daily Vlog",
+        "uploader": "Self Help Daily",
+        "duration": 900
+    }
+    official_trailer = {
+        "title": "Are We Happy? | Official Trailer | Netflix",
+        "uploader": "Netflix",
+        "description": "Watch Are We Happy? (2024) trailer on Netflix",
+        "duration": 135
+    }
+
+    vlog_score = score_trailer_candidate(vlog, "Are We Happy?", 2024)
+    trailer_score = score_trailer_candidate(official_trailer, "Are We Happy?", 2024)
+
+    assert vlog_score < 25.0
+    assert trailer_score >= 50.0
+

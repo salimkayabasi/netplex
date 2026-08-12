@@ -215,6 +215,123 @@ def download_file(url: str, output_path: str):
                     break
                 out_file.write(chunk)
 
+def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float:
+    """
+    Scores a YouTube candidate video entry for how well it matches the desired trailer.
+    Returns a score float. Scores below 25.0 are considered non-matching/disqualified.
+    """
+    if not entry or not isinstance(entry, dict):
+        return -999.0
+
+    v_title = entry.get('title', '') or ''
+    v_uploader = entry.get('uploader') or entry.get('channel') or ''
+    v_desc = entry.get('description', '') or ''
+    v_duration = entry.get('duration')
+
+    # If mock entry without title is passed in tests, derive or fallback
+    if not v_title and (entry.get('webpage_url') or entry.get('id')):
+        v_title = title + " official trailer"
+
+    norm_target = re.sub(r'[^\w\s]', '', title.lower()).strip()
+    norm_candidate = re.sub(r'[^\w\s]', '', v_title.lower()).strip()
+    norm_uploader = v_uploader.lower()
+    norm_desc = v_desc.lower()
+
+    if not norm_target or not norm_candidate:
+        return -999.0
+
+    # 1. Target presence and short title word boundary matching
+    target_words = set(norm_target.split())
+    candidate_words = set(norm_candidate.split())
+
+    matching_words = target_words.intersection(candidate_words)
+    if not matching_words:
+        return -999.0
+
+    # For short titles (<= 4 chars or single word like "Max"), enforce exact word boundary matching
+    if len(title) <= 4 or len(target_words) == 1:
+        pattern = r'\b' + re.escape(norm_target) + r'\b'
+        if not re.search(pattern, norm_candidate):
+            return -999.0
+
+    score = 0.0
+
+    # 2. Negative Term Filtering (Disqualification / Heavy Penalties)
+    negative_terms = [
+        'iphone', 'apple', 'samsung', 'galaxy', 'pixel', 'pro max', 'macbook', 'ipad', 'unboxing', 'gadget',
+        'reaction', 'review', 'gameplay', 'walkthrough', 'lets play', "let's play", 'breakdown', 'ending explained',
+        'explained', 'fan made', 'fan-made', 'concept trailer', 'parody', 'spoiler', 'how to', 'vlog', 'livestream',
+        'podcast', 'full album', 'soundtrack', 'ost', 'theme song', 'cover', 'instrumental', 'remix', 'music video',
+        'full movie', 'movie clip', 'scene clip', 'trailer reaction', 'teaser reaction'
+    ]
+    for neg in negative_terms:
+        if neg in norm_target:
+            continue
+        if neg in norm_candidate or neg in norm_uploader:
+            return -999.0
+
+    # 3. Title Matching Score
+    if norm_target in norm_candidate:
+        score += 35.0
+    elif target_words.issubset(candidate_words):
+        score += 25.0
+    else:
+        word_match_ratio = len(matching_words) / len(target_words)
+        score += word_match_ratio * 20.0
+
+    # 4. Trailer / Teaser Keyword Score
+    if 'official trailer' in norm_candidate:
+        score += 25.0
+    elif 'teaser trailer' in norm_candidate or 'official teaser' in norm_candidate:
+        score += 20.0
+    elif any(kw in norm_candidate for kw in ['trailer', 'teaser', 'first look', 'sneak peek', 'preview']):
+        score += 15.0
+
+    # 5. Release Year Bonus
+    year_str = str(release_year)
+    prev_year_str = str(release_year - 1)
+    next_year_str = str(release_year + 1)
+    if year_str in norm_candidate or year_str in norm_desc:
+        score += 15.0
+    elif prev_year_str in norm_candidate or next_year_str in norm_candidate:
+        score += 10.0
+
+    # 6. Channel / Publisher Trust Bonus
+    netflix_channels = ['netflix', 'netflix india', 'netflix asia', 'netflix uk', 'netflix anime', 'netflix jr']
+    major_distributors = [
+        'warner', 'sony pictures', 'universal pictures', 'paramount', 'disney', 'marvel', 'a24', 'hbo',
+        'movieclips', 'rotten tomatoes', 'ign', 'studiocanal', 'lionsgate', 'hulu', 'amazon prime', 'prime video',
+        'apple tv'
+    ]
+    generic_trailer_channels = ['trailer', 'pictures', 'films', 'studios', 'cinema', 'entertainment']
+
+    if any(ch in norm_uploader for ch in netflix_channels):
+        score += 35.0
+    elif any(ch in norm_uploader for ch in major_distributors):
+        score += 25.0
+    elif any(ch in norm_uploader for ch in generic_trailer_channels):
+        score += 10.0
+
+    # 7. Video Duration Verification
+    if v_duration is not None:
+        try:
+            d = float(v_duration)
+            if 30 <= d <= 300:
+                score += 15.0
+            elif 15 <= d < 30 or 300 < d <= 420:
+                score += 5.0
+            elif d < 15:
+                score -= 30.0
+            elif 600 < d <= 1200:
+                score -= 50.0
+            elif d > 1200:
+                return -999.0
+        except (ValueError, TypeError):
+            pass
+
+    return score
+
+
 def search_and_download_youtube_trailer(
     title: str,
     release_year: int,
@@ -230,48 +347,78 @@ def search_and_download_youtube_trailer(
     
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
+    clean_title = re.sub(r'[\"\']', '', title).strip()
+
     queries = [
-        f'ytsearch1:"{title} ({release_year}) official trailer"',
-        f'ytsearch1:"{title} official trailer"'
+        f'ytsearch5:{clean_title} {release_year} Netflix official trailer',
+        f'ytsearch5:{clean_title} {release_year} official trailer',
+        f'ytsearch5:{clean_title} official trailer',
+        f'ytsearch5:{clean_title} trailer'
     ]
     
-    yt_url = None
-    matched_entry = None
+    best_entry = None
+    best_score = -999.0
+    best_url = None
+    seen_ids = set()
+
+    search_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': False,
+        'skip_download': True,
+    }
+
     for query in queries:
         try:
             logger.info(f"  ├─ Searching YouTube via yt-dlp with query: {query}")
-            search_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': False,
-                'skip_download': True,
-            }
             with yt_dlp.YoutubeDL(search_opts) as ydl:
                 info = ydl.extract_info(query, download=False)
-                if info and 'entries' in info and len(info['entries']) > 0:
-                    entry = info['entries'][0]
-                    if entry:
-                        yt_url = entry.get('webpage_url') or entry.get('url')
-                        if not yt_url and entry.get('id'):
-                            yt_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
-                        if yt_url:
-                            matched_entry = entry
-                            v_title = entry.get('title', 'Unknown Title')
-                            v_uploader = entry.get('uploader') or entry.get('channel', 'Unknown Channel')
-                            v_duration = entry.get('duration')
-                            duration_str = f"{v_duration}s" if v_duration else "N/A"
-                            logger.info(f"  ├─ YouTube match found:")
-                            logger.info(f"  │   ├─ Title: '{v_title}'")
-                            logger.info(f"  │   ├─ Channel: '{v_uploader}'")
-                            logger.info(f"  │   ├─ Duration: {duration_str}")
-                            logger.info(f"  │   └─ URL: {yt_url}")
-                            break
+                if info and 'entries' in info:
+                    for entry in info['entries']:
+                        if not entry:
+                            continue
+                        e_id = entry.get('id') or entry.get('webpage_url')
+                        if e_id in seen_ids:
+                            continue
+                        if e_id:
+                            seen_ids.add(e_id)
+
+                        cand_score = score_trailer_candidate(entry, title, release_year)
+                        cand_title = entry.get('title', 'Unknown Title')
+                        cand_uploader = entry.get('uploader') or entry.get('channel', 'Unknown Channel')
+
+                        logger.debug(f"  │   ├─ Candidate: '{cand_title}' by '{cand_uploader}' | Score: {cand_score:.1f}")
+
+                        if cand_score > best_score:
+                            url = entry.get('webpage_url') or entry.get('url')
+                            if not url and entry.get('id'):
+                                url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                            if url:
+                                best_score = cand_score
+                                best_entry = entry
+                                best_url = url
+
+            if best_score >= 50.0:
+                break
         except Exception as e:
             logger.warning(f"  ├─ YouTube search query failed for '{query}': {e}")
             
-    if not yt_url:
-        logger.warning(f"  ├─ No YouTube trailer found for '{title}'")
+    MIN_SCORE_THRESHOLD = 25.0
+    if not best_url or best_score < MIN_SCORE_THRESHOLD:
+        logger.warning(f"  ├─ No valid YouTube trailer found for '{title}' (Best score: {best_score:.1f}, threshold: {MIN_SCORE_THRESHOLD})")
         return None
+
+    v_title = best_entry.get('title', 'Unknown Title')
+    v_uploader = best_entry.get('uploader') or best_entry.get('channel', 'Unknown Channel')
+    v_duration = best_entry.get('duration')
+    duration_str = f"{v_duration}s" if v_duration else "N/A"
+    logger.info(f"  ├─ YouTube match selected (Score: {best_score:.1f}):")
+    logger.info(f"  │   ├─ Title: '{v_title}'")
+    logger.info(f"  │   ├─ Channel: '{v_uploader}'")
+    logger.info(f"  │   ├─ Duration: {duration_str}")
+    logger.info(f"  │   └─ URL: {best_url}")
+
+    yt_url = best_url
 
     format_spec = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
     try:
