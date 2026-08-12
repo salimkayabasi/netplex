@@ -17,6 +17,7 @@ The container / application behavior can be customized using the following envir
 | `NETPLEX_HOST` | Web application server bind IP | `0.0.0.0` |
 | `NETPLEX_PORT` | Web application server port | `8000` |
 | `NETPLEX_LOG_LEVEL` | Application logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
+| `NETPLEX_LOG_FILTER` | Filter console logs to specific logger name (e.g. `netplex.crawler`) | None |
 
 ---
 

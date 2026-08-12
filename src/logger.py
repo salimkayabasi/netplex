@@ -5,15 +5,36 @@ from logging.handlers import RotatingFileHandler
 
 _initialized = False
 
-def setup_logger(log_level: str = None, log_file: str = None) -> logging.Logger:
+class LoggerFilter(logging.Filter):
+    """
+    Filter that only allows log records matching specified logger names or prefixes.
+    e.g. log_filter="netplex.crawler" matches "netplex.crawler" or "netplex.crawler.foo".
+    Multiple loggers can be comma-separated: "netplex.crawler,netplex.scheduler".
+    """
+    def __init__(self, allowed_loggers: str):
+        super().__init__()
+        self.allowed_loggers = [name.strip() for name in allowed_loggers.split(",") if name.strip()]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not self.allowed_loggers:
+            return True
+        return any(
+            record.name == allowed or record.name.startswith(allowed + ".")
+            for allowed in self.allowed_loggers
+        )
+
+def setup_logger(log_level: str = None, log_file: str = None, log_filter: str = None) -> logging.Logger:
     """
     Configures and returns the application logger with both standard output (stdout)
-    and rotating file handlers.
+    and rotating file handlers. Supports log filtering.
     """
     global _initialized
     if log_level is None:
         log_level = os.environ.get("NETPLEX_LOG_LEVEL", "INFO")
         
+    if log_filter is None:
+        log_filter = os.environ.get("NETPLEX_LOG_FILTER", None)
+
     if log_file is None:
         config_dir = os.environ.get("NETPLEX_CONFIG_DIR", "/config")
         log_file = os.path.join(config_dir, "netplex.log")
@@ -38,6 +59,8 @@ def setup_logger(log_level: str = None, log_file: str = None) -> logging.Logger:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
+    if log_filter:
+        console_handler.addFilter(LoggerFilter(log_filter))
     logger.addHandler(console_handler)
 
     # Rotating File Handler

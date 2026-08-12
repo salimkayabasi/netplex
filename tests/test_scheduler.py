@@ -58,6 +58,20 @@ def test_setup_logger_prevents_duplicate_handlers(tmp_path):
     
     assert initial_count == second_count
 
+def test_setup_logger_with_filter(tmp_path):
+    log_file = tmp_path / "filter.log"
+    logger = setup_logger(log_file=str(log_file), log_filter="netplex.crawler")
+    
+    console_handler = [h for h in logger.handlers if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.handlers.RotatingFileHandler)][0]
+    assert len(console_handler.filters) == 1
+    log_filter_obj = console_handler.filters[0]
+    
+    rec_crawler = logging.LogRecord("netplex.crawler", logging.INFO, "", 0, "Crawler log", (), None)
+    rec_main = logging.LogRecord("netplex.main", logging.INFO, "", 0, "Main log", (), None)
+    
+    assert log_filter_obj.filter(rec_crawler) is True
+    assert log_filter_obj.filter(rec_main) is False
+
 @patch("src.scheduler.sync_plex_collections")
 @patch("src.scheduler.prune_orphans")
 @patch("src.scheduler.download_pending_trailers")

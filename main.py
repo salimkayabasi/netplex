@@ -9,7 +9,21 @@ from src.logger import setup_logger, get_logger
 logger = get_logger("netplex.main")
 
 async def run_server(host: str, port: int):
-    config = uvicorn.Config(app=app, host=host, port=port, log_level="info")
+    log_filter = os.environ.get("NETPLEX_LOG_FILTER", None)
+    uvicorn_log_level = os.environ.get("UVICORN_LOG_LEVEL", "warning" if log_filter else "info")
+    access_log_env = os.environ.get("UVICORN_ACCESS_LOG", None)
+    if access_log_env is not None:
+        access_log = access_log_env.lower() in ("true", "1", "yes")
+    else:
+        access_log = False if log_filter else True
+
+    config = uvicorn.Config(
+        app=app,
+        host=host,
+        port=port,
+        log_level=uvicorn_log_level,
+        access_log=access_log
+    )
     server = uvicorn.Server(config)
     await server.serve()
 
