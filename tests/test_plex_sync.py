@@ -238,3 +238,27 @@ def test_run_plex_sync_offline_resilience(tmp_path):
         # Should gracefully return False without throwing uncaught Exception
         result = run_plex_sync(db_file, "2026-W32")
         assert result is False
+
+
+def test_dedicated_library_section_priority():
+    from src.plex.sync import _get_target_library_section
+    generic_sec = MockLibrarySection("Movies", "movie", [])
+    dedicated_sec = MockLibrarySection("Netflix Top 10 - Movies", "movie", [])
+    mock_server = MockPlexServer([generic_sec, dedicated_sec])
+
+    target = _get_target_library_section(mock_server, media_type="movie")
+    assert target == dedicated_sec
+
+
+def test_match_library_item_zero_byte_stub_resilience():
+    class FaultyPlexItem:
+        @property
+        def title(self):
+            raise AttributeError("Media analysis uninitialized for stub")
+
+    good_item = MockPlexItem("Inside Out 2", 2024)
+    faulty_item = FaultyPlexItem()
+    section = MockLibrarySection("Movies", "movie", [faulty_item, good_item])
+
+    matched = match_library_item(section, "Inside Out 2", year=2024)
+    assert matched == good_item

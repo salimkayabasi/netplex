@@ -52,52 +52,76 @@ def match_library_item(
     search_year = int(year) if year is not None else None
 
     for item in candidates:
-        candidate_title = getattr(item, "title", "")
-        if not candidate_title:
-            continue
+        try:
+            candidate_title = getattr(item, "title", "")
+            if not candidate_title:
+                continue
+                
+            # Strip trailing years in parens e.g., "Inside Out 2 (2024)" -> "Inside Out 2"
+            clean_candidate = re.sub(r'\s*[\(\[\{]\d{4}[\)\]\}]\s*', '', candidate_title).strip().lower()
+            candidate_title_lower = candidate_title.strip().lower()
             
-        # Strip trailing years in parens e.g., "Inside Out 2 (2024)" -> "Inside Out 2"
-        clean_candidate = re.sub(r'\s*[\(\[\{]\d{4}[\)\]\}]\s*', '', candidate_title).strip().lower()
-        candidate_title_lower = candidate_title.strip().lower()
-        
-        # Check year constraint if specified
-        if search_year is not None:
-            item_year = getattr(item, "year", None)
-            if item_year is not None:
-                try:
-                    if abs(int(item_year) - search_year) > 1:
-                        continue
-                except (ValueError, TypeError):
-                    pass
+            # Check year constraint if specified
+            if search_year is not None:
+                item_year = getattr(item, "year", None)
+                if item_year is not None:
+                    try:
+                        if abs(int(item_year) - search_year) > 1:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
 
-        # Calculate similarity scores
-        score_ratio = fuzz.ratio(target_title, clean_candidate)
-        score_token = fuzz.token_sort_ratio(target_title, clean_candidate)
-        score_wratio = fuzz.WRatio(target_title, candidate_title_lower)
-        score = max(score_ratio, score_token, score_wratio)
+            # Calculate similarity scores
+            score_ratio = fuzz.ratio(target_title, clean_candidate)
+            score_token = fuzz.token_sort_ratio(target_title, clean_candidate)
+            score_wratio = fuzz.WRatio(target_title, candidate_title_lower)
+            score = max(score_ratio, score_token, score_wratio)
 
-        if score >= threshold and score > best_score:
-            best_score = score
-            best_item = item
+            if score >= threshold and score > best_score:
+                best_score = score
+                best_item = item
+        except Exception as item_err:
+            logger.debug(f"Skipping candidate item due to media/attr error: {item_err}")
+            continue
 
     return best_item
 
 
-
 def _get_target_library_section(plex_server, media_type: str | None = None, library_name: str | None = None):
-    """Helper to locate appropriate library section on Plex server."""
+    """Helper to locate appropriate library section on Plex server.
+    Prioritizes dedicated target libraries (e.g., 'Netflix Top 10 - Movies', 'Netflix Top 10 - TV Shows').
+    """
     if library_name:
         try:
             return plex_server.library.section(library_name)
         except Exception:
             pass
 
-    sections = plex_server.library.sections()
+    try:
+        sections = plex_server.library.sections()
+    except Exception as e:
+        logger.warning(f"Error fetching Plex library sections: {e}")
+        return None
+
     if not sections:
         return None
 
     if media_type:
-        target_type = "movie" if media_type.lower() in ("movie", "films", "movies") else "show"
+        is_movie = media_type.lower() in ("movie", "films", "movies")
+        target_type = "movie" if is_movie else "show"
+        dedicated_names = (
+            ["Netflix Top 10 - Movies", "Netflix Top 10 Movies", "Netflix Top 10"]
+            if is_movie
+            else ["Netflix Top 10 - TV Shows", "Netflix Top 10 TV Shows", "Netflix Top 10 - TV", "Netflix Top 10 TV"]
+        )
+        
+        # Priority 1: Search for dedicated library section by name
+        for sec in sections:
+            sec_title = getattr(sec, "title", "")
+            if sec_title in dedicated_names:
+                return sec
+                
+        # Priority 2: Fall back to first section matching target media type
         for sec in sections:
             if getattr(sec, "type", None) == target_type:
                 return sec
