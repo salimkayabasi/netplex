@@ -71,3 +71,62 @@ def test_write_nfo_file(tmp_path):
     nfo_path = target_dir / "movie.nfo"
     assert nfo_path.exists()
     assert nfo_path.read_text(encoding="utf-8") == xml_content
+
+def test_generate_nfo_xml_rich_metadata():
+    xml_str = generate_nfo_xml(
+        title="Stranger Things",
+        year=2016,
+        plot="When a young boy vanishes, a small town uncovers a mystery.",
+        netflix_id="80057281",
+        is_tv=True,
+        local_title="Stranger Things: Turkish Title",
+        tagline="One summer can change everything.",
+        maturity_rating="TV-14",
+        runtime_seconds=3600,
+        studio="Netflix",
+        country="United States",
+        genres=["Drama", "Sci-Fi"],
+        tags=["Top 10", "Netflix Original"],
+        directors=["The Duffer Brothers", "Shawn Levy"],
+        creators=["The Duffer Brothers"],
+        actors=["Millie Bobby Brown", "Finn Wolfhard"],
+        poster_url="https://image.netflix.com/poster.jpg",
+        logo_url="https://image.netflix.com/logo.png",
+        fanart_url="https://image.netflix.com/hero.jpg",
+        trailer_url="Season 01/S01E00 - Trailer.mp4",
+        season_count=5
+    )
+
+    content = xml_str.replace('<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>', '').strip()
+    root = ET.fromstring(content)
+    assert root.tag == "tvshow"
+    assert root.find("title").text == "Stranger Things"
+    assert root.find("originaltitle").text == "Stranger Things: Turkish Title"
+    assert root.find("tagline").text == "One summer can change everything."
+    assert root.find("mpaa").text == "TV-14"
+    assert root.find("certification").text == "TV-14"
+    assert root.find("runtime").text == "60"
+    assert root.find("studio").text == "Netflix"
+    assert root.find("country").text == "United States"
+
+    genres = [g.text for g in root.findall("genre")]
+    assert genres == ["Drama", "Sci-Fi"]
+
+    tags = [t.text for t in root.findall("tag")]
+    assert tags == ["Top 10", "Netflix Original"]
+
+    directors = [d.text for d in root.findall("director")]
+    assert directors == ["The Duffer Brothers", "Shawn Levy"]
+
+    creators = [c.text for c in root.findall("credits")]
+    assert creators == ["The Duffer Brothers"]
+
+    actors = [a.find("name").text for a in root.findall("actor")]
+    assert actors == ["Millie Bobby Brown", "Finn Wolfhard"]
+
+    assert root.find("poster").text == "https://image.netflix.com/poster.jpg"
+    assert root.find("clearlogo").text == "https://image.netflix.com/logo.png"
+    assert root.find("fanart/thumb").text == "https://image.netflix.com/hero.jpg"
+    assert root.find("trailer").text == "Season 01/S01E00 - Trailer.mp4"
+    assert root.find("season").text == "5"
+

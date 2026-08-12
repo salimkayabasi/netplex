@@ -79,7 +79,7 @@ def find_tudum_page(title: str, item_type: str, year: int) -> str | None:
     return None
 
 def extract_trailer_assets(tudum_url: str | None) -> dict:
-    """Fetches the HTML of the Tudum page and extracts metadata assets (plot, poster, logo, netflix_id, etc.)."""
+    """Fetches the HTML of the Tudum page and extracts metadata assets (plot, poster, logo, netflix_id, cast, directors, tagline, rating, etc.)."""
     empty_result = {
         "video_url": None,
         "subtitle_url": None,
@@ -87,8 +87,16 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         "netflix_id": None,
         "poster_url": None,
         "logo_url": None,
+        "fanart_url": None,
+        "tagline": None,
         "maturity_rating": None,
-        "runtime_seconds": None
+        "runtime_seconds": None,
+        "actors": [],
+        "directors": [],
+        "creators": [],
+        "genres": [],
+        "tags": [],
+        "season_count": None
     }
     if not tudum_url:
         return empty_result
@@ -128,6 +136,8 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
     og_img_match = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']', content, re.IGNORECASE)
     if og_img_match:
         poster_url = sanitize_url(og_img_match.group(1))
+
+    fanart_url = poster_url
     
     # Extract synopsis / plot
     plot = None
@@ -146,6 +156,14 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         og_match = re.search(r'<meta\s+[^>]*property="og:description"\s+content="([^"]+)"', content, re.IGNORECASE)
         if og_match:
             plot = og_match.group(1).strip()
+
+    # Extract Tagline / Sub-headline
+    tagline = None
+    subhead_match = re.search(r'data-uia="sub-headline"[^>]*>(.*?)</div>', content, re.DOTALL)
+    if subhead_match:
+        raw_sub = re.sub(r'<[^>]+>', '', subhead_match.group(1)).strip()
+        if raw_sub and len(raw_sub) < 300:
+            tagline = raw_sub
 
     # Extract Netflix ID
     netflix_id = None
@@ -178,6 +196,23 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         except ValueError:
             runtime_seconds = None
 
+    # Extract tags & season count
+    tags = []
+    season_count = None
+    tag_elements = re.findall(r'data-uia="tag"[^>]*>(.*?)</span>', content, re.DOTALL)
+    for tag_html in tag_elements:
+        clean_t = re.sub(r'<[^>]+>', '', tag_html).strip()
+        if clean_t:
+            tags.append(clean_t)
+            s_match = re.search(r'(\d+)\s+Seasons?', clean_t, re.IGNORECASE)
+            if s_match:
+                try:
+                    season_count = int(s_match.group(1))
+                except ValueError:
+                    pass
+            if not maturity_rating and clean_t in ['TV-MA', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'PG-13', 'PG', 'R', 'G', 'NC-17']:
+                maturity_rating = clean_t
+
     # Extract cast / actors
     actors = []
     cast_match = re.search(r'data-uia="cast"[^>]*>(.*?)</div>', content, re.DOTALL)
@@ -199,22 +234,44 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
 
     # Extract directors / creators
     directors = []
-    dir_match = re.search(r'data-uia="(?:directors|creators)"[^>]*>(.*?)</div>', content, re.DOTALL)
+    creators = []
+    dir_match = re.search(r'data-uia="directors"[^>]*>(.*?)</div>', content, re.DOTALL)
     if dir_match:
         raw_dir = re.sub(r'<[^>]+>', '', dir_match.group(1)).strip()
         if raw_dir:
             directors = [d.strip() for d in re.split(r'[,|;]', raw_dir) if d.strip()]
-    if not directors:
+
+    creator_html_match = re.search(r'data-uia="creators"[^>]*>(.*?)</div>', content, re.DOTALL)
+    if creator_html_match:
+        raw_creator = re.sub(r'<[^>]+>', '', creator_html_match.group(1)).strip()
+        if raw_creator:
+            creators = [c.strip() for c in re.split(r'[,|;]', raw_creator) if c.strip()]
+
+    if not directors and not creators:
         dir_json = re.search(r'"(?:directors|creators)"\s*:\s*\[([^\]]+)\]', content)
         if dir_json:
             found_dirs = re.findall(r'"name"\s*:\s*"([^"]+)"', dir_json.group(1))
             if not found_dirs:
                 found_dirs = [n.strip(' "\'') for n in dir_json.group(1).split(',')]
             directors = [f for f in found_dirs if f]
+            
     if not directors:
-        creator_match = re.search(r'(?:Directed by|Created by|Directors?|Creators?):\s*([^<]+)', content, re.IGNORECASE)
-        if creator_match:
-            directors = [d.strip() for d in re.split(r'[,|;]', creator_match.group(1)) if d.strip()]
+        dir_text_match = re.search(r'(?:Directed by|Directors?):\s*([^<]+)', content, re.IGNORECASE)
+        if dir_text_match:
+            directors = [d.strip() for d in re.split(r'[,|;]', dir_text_match.group(1)) if d.strip()]
+
+    if not creators:
+        creator_text_match = re.search(r'(?:Created by|Creators?):\s*([^<]+)', content, re.IGNORECASE)
+        if creator_text_match:
+            creators = [c.strip() for c in re.split(r'[,|;]', creator_text_match.group(1)) if c.strip()]
+
+    # Deduplicate while preserving order
+    actors = list(dict.fromkeys(actors))
+    directors = list(dict.fromkeys(directors))
+    creators = list(dict.fromkeys(creators))
+    tags = list(dict.fromkeys(tags))
+
+    genres = [t for t in tags if t not in ['TV-14', 'TV-MA', 'PG-13', 'R', 'TV-PG'] and not re.search(r'^\d{4}$', t) and not 'Season' in t]
 
     return {
         "video_url": video_url,
@@ -223,10 +280,16 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         "netflix_id": netflix_id,
         "poster_url": poster_url,
         "logo_url": logo_url,
+        "fanart_url": fanart_url,
+        "tagline": tagline,
         "maturity_rating": maturity_rating,
         "runtime_seconds": runtime_seconds,
         "actors": actors,
-        "directors": directors
+        "directors": directors,
+        "creators": creators,
+        "genres": genres,
+        "tags": tags,
+        "season_count": season_count
     }
 
 def download_file(url: str, output_path: str):
@@ -766,12 +829,30 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 netflix_id = assets.get("netflix_id")
                 is_tv = (item['type'] == 'tv')
                 
+                trailer_rel = f"Season {season_padded}/{video_filename}" if is_tv else video_filename
+                trailer_url = item.get('youtube_url') or trailer_rel
+                
                 nfo_xml = generate_nfo_xml(
                     title=item['title'],
                     year=item['release_year'],
                     plot=plot,
                     netflix_id=netflix_id,
-                    is_tv=is_tv
+                    is_tv=is_tv,
+                    local_title=item.get('local_title'),
+                    tagline=assets.get('tagline'),
+                    maturity_rating=assets.get('maturity_rating'),
+                    runtime_seconds=assets.get('runtime_seconds'),
+                    studio="Netflix",
+                    genres=assets.get('genres'),
+                    tags=assets.get('tags'),
+                    directors=assets.get('directors'),
+                    creators=assets.get('creators'),
+                    actors=assets.get('actors'),
+                    poster_url=assets.get('poster_url'),
+                    logo_url=assets.get('logo_url'),
+                    fanart_url=assets.get('fanart_url'),
+                    trailer_url=trailer_url,
+                    season_count=assets.get('season_count')
                 )
                 
                 logger.info(f"  ├─ Generating and writing NFO metadata ({nfo_file}) at {nfo_dir}...")

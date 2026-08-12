@@ -111,6 +111,10 @@ def test_extract_trailer_assets_with_fixture():
         assert assets["plot"] is not None
         assert "When a young boy vanishes" in assets["plot"]
         assert assets["netflix_id"] == "80057281"
+        assert assets["maturity_rating"] == "TV-14"
+        assert assets["season_count"] == 5
+        assert "2016" in assets["tags"]
+        assert "5 Seasons" in assets["tags"]
 
 @patch('urllib.request.urlopen')
 def test_extract_trailer_assets_custom_html(mock_urlopen):
