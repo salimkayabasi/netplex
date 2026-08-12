@@ -180,7 +180,7 @@ def test_auto_trigger_crawl_on_region_change(client_and_db):
 
 def test_auto_trigger_crawl_on_dummy_mode_deactivation(client_and_db, tmp_path):
     client, db_path, _, _ = client_and_db
-    from src.database import set_setting, upsert_media_item, update_media_item_status
+    from src.database import set_setting, upsert_media_item, update_media_item_status, _get_connection
 
     # Enable dummy mode first
     set_setting(db_path, "dummy_media_mode", "true")
