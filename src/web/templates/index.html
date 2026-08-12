@@ -37,7 +37,13 @@
         {% if section.rankings %}
         <div class="ranking-grid">
             {% for item in section.rankings %}
-            <div class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}" {% if not dummy_media_mode %}onclick="openTrailerModal({{ item.media_item_id }}, '{{ item.title | escape }}')"{% endif %}>
+            <div class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}"
+                 {% if not dummy_media_mode %}
+                 data-media-id="{{ item.media_item_id }}"
+                 data-title="{{ item.title | escape }}"
+                 data-youtube-url="{{ item.youtube_url if item.youtube_url else '' }}"
+                 onclick="openTrailerModal(this.dataset.mediaId, this.dataset.title, this.dataset.youtubeUrl)"
+                 {% endif %}>
                 <div class="rank-badge">{% if item.rank < 10 %}0{{ item.rank }}{% else %}{{ item.rank }}{% endif %}</div>
                 <div class="card-poster">
                     {% if item.poster_url %}

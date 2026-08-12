@@ -193,3 +193,29 @@ def test_dummy_media_mode_ui_and_stream(test_env, monkeypatch):
     assert "Dummy media mode" in resp_stream.json()["detail"]
 
 
+def test_youtube_button_in_player_modal(test_env):
+    client = test_env["client"]
+    db_path = test_env["db_path"]
+
+    set_monitored_country(db_path, "US", "movie")
+    yt_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    item_id = upsert_media_item(
+        db_path,
+        title="Rick Roll Movie",
+        type="movie",
+        release_year=2024,
+        season_name=None,
+        folder_name="Rick Roll Movie (2024)",
+        youtube_url=yt_url
+    )
+    insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item_id)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="modal-yt-btn"' in response.text
+    assert 'Watch on YouTube' in response.text
+    assert 'target="_blank"' in response.text
+    assert f'data-youtube-url="{yt_url}"' in response.text
+
+
+

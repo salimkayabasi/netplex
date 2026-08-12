@@ -431,9 +431,60 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.modal-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
 .modal-title {
     font-size: 1.25rem;
     font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.btn-watch-youtube,
+.btn-watch-youtube:link,
+.btn-watch-youtube:visited,
+.btn-watch-youtube:active {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+    text-decoration: none !important;
+    vertical-align: middle;
+    cursor: pointer;
+    line-height: 1;
+    transition: transform 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+    opacity: 0.95;
+}
+
+.btn-watch-youtube:hover {
+    opacity: 1;
+    transform: scale(1.12);
+    filter: drop-shadow(0 2px 8px rgba(255, 0, 0, 0.6));
+}
+
+.btn-watch-youtube .yt-icon {
+    width: 28px;
+    height: 20px;
+    display: block;
+    flex-shrink: 0;
+}
+
+.main-footer {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    margin-top: 3rem;
+    line-height: 1.5;
 }
 
 .modal-close-btn {

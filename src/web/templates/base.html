@@ -33,7 +33,15 @@
     <div id="trailer-modal" class="modal-backdrop">
         <div class="modal-container">
             <div class="modal-header">
-                <h3 id="modal-media-title" class="modal-title">Trailer Player</h3>
+                <div class="modal-title-wrapper">
+                    <h3 id="modal-media-title" class="modal-title">Trailer Player</h3>
+                    <a id="modal-yt-btn" class="btn-watch-youtube" href="#" target="_blank" rel="noopener noreferrer" title="Watch on YouTube" aria-label="Watch on YouTube" style="display: none;">
+                        <svg class="yt-icon" viewBox="0 0 24 24" width="28" height="20">
+                            <path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/>
+                            <path fill="#FFFFFF" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                    </a>
+                </div>
                 <button id="modal-close-btn" class="modal-close-btn" aria-label="Close modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -41,6 +49,10 @@
             </div>
         </div>
     </div>
+
+    <footer class="main-footer">
+        <p>NetPlex is an independent, non-commercial hobby project and is not affiliated, endorsed, or associated with Netflix, Inc., Plex, Inc., or YouTube, LLC / Google LLC. All trademarks belong to their respective owners.</p>
+    </footer>
 
     <script src="/static/js/netflex.js"></script>
 </body>

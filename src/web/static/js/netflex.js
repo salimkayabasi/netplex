@@ -5,9 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalTitle = document.getElementById('modal-media-title');
     const videoPlayer = document.getElementById('modal-video-player');
     const closeBtn = document.getElementById('modal-close-btn');
+    const ytBtn = document.getElementById('modal-yt-btn');
 
     // Open video trailer modal
-    window.openTrailerModal = (itemId, title) => {
+    window.openTrailerModal = (itemId, title, youtubeUrl) => {
         if (window.DUMMY_MEDIA_MODE) {
             console.log('Dummy media mode enabled: trailer player UI disabled.');
             return;
@@ -16,6 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (modalTitle) {
             modalTitle.textContent = title;
+        }
+
+        if (ytBtn) {
+            if (youtubeUrl && typeof youtubeUrl === 'string' && youtubeUrl.trim() !== '' && youtubeUrl.trim() !== 'None' && youtubeUrl.trim() !== 'null') {
+                ytBtn.href = youtubeUrl.trim();
+                ytBtn.style.display = 'inline-flex';
+            } else {
+                ytBtn.href = '#';
+                ytBtn.style.display = 'none';
+            }
         }
         
         // Set video source
@@ -35,6 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
         videoPlayer.pause();
         videoPlayer.src = '';
         modalBackdrop.classList.remove('active');
+        if (ytBtn) {
+            ytBtn.href = '#';
+            ytBtn.style.display = 'none';
+        }
     };
 
     if (closeBtn) {
