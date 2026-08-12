@@ -334,4 +334,36 @@ def test_calculate_expected_total_tasks(initialized_db):
     total = calculate_expected_total_tasks(initialized_db)
     assert total == 40
 
+def test_reset_zero_byte_media_stubs(initialized_db, tmp_path):
+    from src.database import reset_zero_byte_media_stubs, update_media_item_status
+    
+    # 1. Create a media item with a 0-byte file
+    stub_file = tmp_path / "stub.mp4"
+    stub_file.write_bytes(b"")
+    
+    item1 = upsert_media_item(initialized_db, "Stub Movie 1", "movie", 2026, None, "Stub Movie 1 (2026)")
+    update_media_item_status(initialized_db, item1, "downloaded", file_path=str(stub_file))
+
+    # 2. Create a media item with a non-zero byte file
+    real_file = tmp_path / "real.mp4"
+    real_file.write_bytes(b"video content data 12345")
+
+    item2 = upsert_media_item(initialized_db, "Real Movie 2", "movie", 2026, None, "Real Movie 2 (2026)")
+    update_media_item_status(initialized_db, item2, "downloaded", file_path=str(real_file))
+
+    # Reset 0-byte media stubs
+    reset_ids = reset_zero_byte_media_stubs(initialized_db)
+    assert reset_ids == [item1]
+
+    # Verify status in DB
+    conn = _get_connection(initialized_db)
+    try:
+        cursor = conn.execute("SELECT id, status FROM media_items WHERE id IN (?, ?)", (item1, item2))
+        statuses = {row["id"]: row["status"] for row in cursor.fetchall()}
+        assert statuses[item1] == "pending"
+        assert statuses[item2] == "downloaded"
+    finally:
+        conn.close()
+
+
 

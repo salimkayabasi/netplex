@@ -458,3 +458,27 @@ def calculate_expected_total_tasks(db_path: str) -> int:
             
     return max(expected_count, pending_count)
 
+
+def reset_zero_byte_media_stubs(db_path: str) -> list[int]:
+    """
+    Checks all media items in the database for zero-byte local video files.
+    If a media item's file_path exists and has a file size of 0,
+    resets its status to 'pending' so full video content can be downloaded.
+    Returns a list of updated media item IDs.
+    """
+    conn = _get_connection(db_path)
+    reset_ids = []
+    try:
+        cursor = conn.execute("SELECT id, file_path, status FROM media_items")
+        rows = cursor.fetchall()
+        for row in rows:
+            fpath = row["file_path"]
+            if fpath and os.path.exists(fpath) and os.path.getsize(fpath) == 0:
+                conn.execute("UPDATE media_items SET status = 'pending' WHERE id = ?", (row["id"],))
+                reset_ids.append(row["id"])
+        conn.commit()
+    finally:
+        conn.close()
+    return reset_ids
+
+

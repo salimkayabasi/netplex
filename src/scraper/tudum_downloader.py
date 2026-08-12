@@ -9,7 +9,8 @@ from src.database import (
     get_setting,
     update_media_item_status,
     update_media_item_poster,
-    update_media_item_tudum_metadata
+    update_media_item_tudum_metadata,
+    reset_zero_byte_media_stubs
 )
 from src.crawler_lock import set_crawl_progress
 from src.metadata.nfo_generator import (
@@ -311,6 +312,13 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
     """Fetches all pending media items from the database and downloads their trailers/subtitles."""
     if media_dir is None:
         media_dir = os.environ.get("NETPLEX_DATA_DIR", "/data")
+        
+    dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    if not dummy_media_mode:
+        reset_ids = reset_zero_byte_media_stubs(db_path)
+        if reset_ids:
+            logger.info(f"Dummy mode deactivated/disabled: Found {len(reset_ids)} zero-byte media stub file(s). Resetting status to 'pending' to download real trailers.")
+
     conn = _get_connection(db_path)
     try:
         cursor = conn.execute("SELECT id, title, type, release_year, season_name, folder_name FROM media_items WHERE status = 'pending'")
@@ -320,8 +328,6 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
         
     if not items:
         return
-        
-    dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
     trailer_subtitles = get_setting(db_path, "trailer_subtitles", "false").lower() in ("true", "1", "yes", "on")
     subtitle_languages_str = get_setting(db_path, "subtitle_languages", "en")
     subtitle_langs = [lang.strip() for lang in subtitle_languages_str.split(",") if lang.strip()]

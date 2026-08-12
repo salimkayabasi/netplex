@@ -16,7 +16,8 @@ from src.database import (
     get_monitored_countries,
     set_monitored_country,
     remove_monitored_country,
-    calculate_expected_total_tasks
+    calculate_expected_total_tasks,
+    reset_zero_byte_media_stubs
 )
 from src.plex.auth import request_plex_pin, poll_plex_pin
 from src.plex.sync import run_plex_sync
@@ -194,9 +195,16 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
         set_setting(db_path, "plex_url", str(plex_url))
     if plex_token is not None:
         set_setting(db_path, "plex_token", str(plex_token))
+    
+    dummy_mode_deactivated = False
     if dummy_media_mode is not None:
+        prev_val = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
         val = "true" if str(dummy_media_mode).lower() in ("true", "1", "on", "yes") else "false"
         set_setting(db_path, "dummy_media_mode", val)
+        new_val = (val == "true")
+        if prev_val and not new_val:
+            dummy_mode_deactivated = True
+
     if trailer_subtitles is not None:
         val = "true" if str(trailer_subtitles).lower() in ("true", "1", "on", "yes") else "false"
         set_setting(db_path, "trailer_subtitles", val)
@@ -230,13 +238,21 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
             for code, formats in new_map.items():
                 set_monitored_country(db_path, code, formats)
 
-    # Auto-trigger crawler if region configuration has changed and no crawler is running
-    if region_changed and not is_crawl_in_progress():
+    # Check for zero-byte media stubs if dummy mode is inactive
+    dummy_mode_active = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    stubs_reset_count = 0
+    if not dummy_mode_active:
+        reset_ids = reset_zero_byte_media_stubs(db_path)
+        stubs_reset_count = len(reset_ids)
+
+    # Auto-trigger crawler if region configuration changed or dummy mode deactivated / zero-byte stubs reset
+    should_trigger_crawl = region_changed or dummy_mode_deactivated or (stubs_reset_count > 0)
+    if should_trigger_crawl and not is_crawl_in_progress():
         if try_acquire_crawl_lock():
             background_tasks.add_task(run_crawl_pipeline, db_path)
 
     if "application/json" in content_type:
-        return JSONResponse({"status": "success", "message": "Settings updated successfully", "crawl_triggered": region_changed})
+        return JSONResponse({"status": "success", "message": "Settings updated successfully", "crawl_triggered": should_trigger_crawl})
     else:
         return RedirectResponse(url="/settings?success=1", status_code=303)
 

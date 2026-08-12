@@ -178,6 +178,34 @@ def test_auto_trigger_crawl_on_region_change(client_and_db):
         assert resp.status_code == 200
         assert resp.json()["crawl_triggered"] is True
 
+def test_auto_trigger_crawl_on_dummy_mode_deactivation(client_and_db, tmp_path):
+    client, db_path, _, _ = client_and_db
+    from src.database import set_setting, upsert_media_item, update_media_item_status
+
+    # Enable dummy mode first
+    set_setting(db_path, "dummy_media_mode", "true")
+
+    # Add a 0-byte media stub
+    stub_file = tmp_path / "zero_stub.mp4"
+    stub_file.write_bytes(b"")
+    item_id = upsert_media_item(db_path, "Stub Film", "movie", 2026, None, "Stub Film (2026)")
+    update_media_item_status(db_path, item_id, "downloaded", file_path=str(stub_file))
+
+    with patch("src.web.routes_settings.run_crawl_pipeline") as mock_pipeline:
+        # Deactivate dummy mode
+        payload = {"dummy_media_mode": False}
+        resp = client.post("/api/settings", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["crawl_triggered"] is True
+        
+        # Verify status was reset to pending for the 0-byte stub file
+        conn = _get_connection(db_path)
+        try:
+            row = conn.execute("SELECT status FROM media_items WHERE id = ?", (item_id,)).fetchone()
+            assert row["status"] == "pending"
+        finally:
+            conn.close()
+
 def test_crawl_status_task_display(client_and_db):
     client, _, _, _ = client_and_db
     from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock, set_crawl_progress
@@ -195,5 +223,6 @@ def test_crawl_status_task_display(client_and_db):
         assert "Are We Happy?" in data["message"]
     finally:
         release_crawl_lock()
+
 
 
