@@ -52,6 +52,7 @@ def init_db(db_path: str = "/config/netplex.db"):
                     logo_url TEXT,
                     video_url TEXT,
                     subtitle_url TEXT,
+                    youtube_url TEXT,
                     netflix_id INTEGER,
                     synopsis TEXT,
                     maturity_rating TEXT,
@@ -73,6 +74,7 @@ def init_db(db_path: str = "/config/netplex.db"):
                 'logo_url': 'TEXT',
                 'video_url': 'TEXT',
                 'subtitle_url': 'TEXT',
+                'youtube_url': 'TEXT',
                 'netflix_id': 'INTEGER',
                 'synopsis': 'TEXT',
                 'maturity_rating': 'TEXT',
@@ -216,7 +218,8 @@ def upsert_media_item(
     logo_url: str | None = None,
     video_url: str | None = None,
     subtitle_url: str | None = None,
-    poster_url: str | None = None
+    poster_url: str | None = None,
+    youtube_url: str | None = None
 ) -> int:
     conn = _get_connection(db_path)
     try:
@@ -237,7 +240,8 @@ def upsert_media_item(
                 'logo_url': logo_url,
                 'video_url': video_url,
                 'subtitle_url': subtitle_url,
-                'poster_url': poster_url
+                'poster_url': poster_url,
+                'youtube_url': youtube_url
             }
             if row:
                 media_item_id = row['id']
@@ -319,7 +323,8 @@ def update_media_item_tudum_metadata(
     poster_url: str | None = None,
     logo_url: str | None = None,
     maturity_rating: str | None = None,
-    runtime_seconds: int | None = None
+    runtime_seconds: int | None = None,
+    youtube_url: str | None = None
 ):
     conn = _get_connection(db_path)
     try:
@@ -334,7 +339,8 @@ def update_media_item_tudum_metadata(
                 'poster_url': poster_url,
                 'logo_url': logo_url,
                 'maturity_rating': maturity_rating,
-                'runtime_seconds': runtime_seconds
+                'runtime_seconds': runtime_seconds,
+                'youtube_url': youtube_url
             }
             for key, val in kwargs.items():
                 if val is not None:
@@ -409,7 +415,7 @@ def get_active_rankings(db_path: str, country_code: str, category: str, week: st
                 r.weekly_hours_viewed, r.weekly_views, r.cumulative_weeks_in_top_10,
                 m.id AS media_item_id, m.title, m.local_title, m.show_title, m.season_title,
                 m.type, m.release_year, m.season_name, m.folder_name, m.file_path, m.poster_url,
-                m.logo_url, m.video_url, m.subtitle_url, m.netflix_id, m.synopsis, m.maturity_rating,
+                m.logo_url, m.video_url, m.subtitle_url, m.youtube_url, m.netflix_id, m.synopsis, m.maturity_rating,
                 m.runtime_seconds, m.status, m.added_at, m.last_seen_at
             FROM rankings r
             JOIN media_items m ON r.media_item_id = m.id
@@ -459,11 +465,10 @@ def calculate_expected_total_tasks(db_path: str) -> int:
     return max(expected_count, pending_count)
 
 
-def reset_zero_byte_media_stubs(db_path: str) -> list[int]:
+def reset_stubs_and_failed_media_items(db_path: str) -> list[int]:
     """
-    Checks all media items in the database for zero-byte local video files.
-    If a media item's file_path exists and has a file size of 0,
-    resets its status to 'pending' so full video content can be downloaded.
+    Checks all media items in the database for zero-byte local video files OR status = 'failed'.
+    Resets their status to 'pending' so full video content can be searched and downloaded.
     Returns a list of updated media item IDs.
     """
     conn = _get_connection(db_path)
@@ -473,12 +478,19 @@ def reset_zero_byte_media_stubs(db_path: str) -> list[int]:
         rows = cursor.fetchall()
         for row in rows:
             fpath = row["file_path"]
-            if fpath and os.path.exists(fpath) and os.path.getsize(fpath) == 0:
+            status = row["status"]
+            is_zero_byte = fpath and os.path.exists(fpath) and os.path.getsize(fpath) == 0
+            is_failed = (status == "failed")
+            if is_zero_byte or is_failed:
                 conn.execute("UPDATE media_items SET status = 'pending' WHERE id = ?", (row["id"],))
                 reset_ids.append(row["id"])
         conn.commit()
     finally:
         conn.close()
     return reset_ids
+
+
+def reset_zero_byte_media_stubs(db_path: str) -> list[int]:
+    return reset_stubs_and_failed_media_items(db_path)
 
 

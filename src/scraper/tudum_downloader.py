@@ -10,6 +10,7 @@ from src.database import (
     update_media_item_status,
     update_media_item_poster,
     update_media_item_tudum_metadata,
+    reset_stubs_and_failed_media_items,
     reset_zero_byte_media_stubs
 )
 from src.crawler_lock import set_crawl_progress
@@ -78,7 +79,7 @@ def find_tudum_page(title: str, item_type: str, year: int) -> str | None:
     return None
 
 def extract_trailer_assets(tudum_url: str | None) -> dict:
-    """Fetches the HTML of the Tudum page, extracts the unescaped graphql models, and locates media assets."""
+    """Fetches the HTML of the Tudum page and extracts metadata assets (plot, poster, logo, netflix_id, etc.)."""
     empty_result = {
         "video_url": None,
         "subtitle_url": None,
@@ -118,14 +119,9 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         except Exception:
             pass
             
-    # Find all double-quoted URLs containing .mp4 or .mkv
-    video_urls = re.findall(r'"((?:https?://|/)[^"]+?\.(?:mp4|mkv)[^"]*)"', content)
-    filtered_videos = [u for u in video_urls if "TudumSignIn_" not in u]
-    video_url = sanitize_url(filtered_videos[0]) if filtered_videos else None
-    
-    # Find all double-quoted URLs containing .vtt or .srt
-    subtitle_urls = re.findall(r'"((?:https?://|/)[^"]+?\.(?:vtt|srt)[^"]*)"', content)
-    subtitle_url = sanitize_url(subtitle_urls[0]) if subtitle_urls else None
+    # Bypassed direct video/subtitle URL scraping from Tudum HTML
+    video_url = None
+    subtitle_url = None
 
     # Extract poster URL (og:image)
     poster_url = None
@@ -218,6 +214,83 @@ def download_file(url: str, output_path: str):
                 if not chunk:
                     break
                 out_file.write(chunk)
+
+def search_and_download_youtube_trailer(
+    title: str,
+    release_year: int,
+    output_path: str,
+    fetch_subtitles: bool = False,
+    subtitle_langs: list[str] = None
+) -> str | None:
+    """
+    Searches YouTube for official trailer using yt-dlp, saves to output_path,
+    and returns YouTube webpage URL if successful.
+    """
+    import yt_dlp
+    
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    queries = [
+        f'ytsearch1:"{title} ({release_year}) official trailer"',
+        f'ytsearch1:"{title} official trailer"'
+    ]
+    
+    yt_url = None
+    for query in queries:
+        try:
+            logger.info(f"  ├─ Searching YouTube via yt-dlp: {query}")
+            search_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': False,
+                'skip_download': True,
+            }
+            with yt_dlp.YoutubeDL(search_opts) as ydl:
+                info = ydl.extract_info(query, download=False)
+                if info and 'entries' in info and len(info['entries']) > 0:
+                    entry = info['entries'][0]
+                    if entry:
+                        yt_url = entry.get('webpage_url') or entry.get('url')
+                        if not yt_url and entry.get('id'):
+                            yt_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                        if yt_url:
+                            logger.info(f"  ├─ Found YouTube video URL: {yt_url}")
+                            break
+        except Exception as e:
+            logger.warning(f"  ├─ YouTube search query failed for '{query}': {e}")
+            
+    if not yt_url:
+        logger.warning(f"  ├─ No YouTube trailer found for '{title}'")
+        return None
+
+    try:
+        logger.info(f"  ├─ Downloading YouTube video via yt-dlp: {yt_url} -> {output_path}")
+        ydl_opts = {
+            'outtmpl': output_path,
+            'quiet': True,
+            'no_warnings': True,
+            'noprogress': True,
+            'overwrites': True,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        }
+        if fetch_subtitles:
+            sub_lang = subtitle_langs[0] if subtitle_langs else "en"
+            ydl_opts.update({
+                'writesubtitles': True,
+                'writeautomaticsub': True,
+                'subtitleslangs': [sub_lang],
+                'postprocessors': [{
+                    'key': 'FFmpegSubtitlesConvertor',
+                    'format': 'srt',
+                }],
+            })
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([yt_url])
+        
+        return yt_url
+    except Exception as e:
+        logger.error(f"  ├─ yt-dlp download failed for '{yt_url}': {e}")
+        return None
 
 
 def convert_vtt_to_srt(vtt_content: str) -> str:
@@ -315,9 +388,9 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
         
     dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
     if not dummy_media_mode:
-        reset_ids = reset_zero_byte_media_stubs(db_path)
+        reset_ids = reset_stubs_and_failed_media_items(db_path)
         if reset_ids:
-            logger.info(f"Dummy mode deactivated/disabled: Found {len(reset_ids)} zero-byte media stub file(s). Resetting status to 'pending' to download real trailers.")
+            logger.info(f"Dummy mode deactivated/disabled: Found {len(reset_ids)} zero-byte media stub file(s) or failed items. Resetting status to 'pending' to download real trailers.")
 
     conn = _get_connection(db_path)
     try:
@@ -339,21 +412,15 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
         logger.info(f"Processing trailer for '{item['title']}' ({item['type'].upper()}, ID: {item['id']})")
 
         try:
-            logger.info(f"  ├─ Searching Netflix Tudum page for '{item['title']}'...")
+            logger.info(f"  ├─ Searching Netflix Tudum page for '{item['title']}' metadata...")
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
             if tudum_url:
                 logger.info(f"  ├─ Found Tudum page URL: {tudum_url}")
             else:
                 logger.info(f"  ├─ No direct Tudum page found for '{item['title']}'. Checking fallback page.")
                 
-            logger.info(f"  ├─ Scraping trailer video stream and metadata from Tudum page...")
             assets = extract_trailer_assets(tudum_url)
             
-            if assets.get("video_url"):
-                logger.info(f"  ├─ Extracted video stream URL: {assets['video_url']}")
-            else:
-                logger.warning(f"  ├─ No video stream URL found for '{item['title']}' on Tudum page")
-                
             update_media_item_tudum_metadata(
                 db_path,
                 item['id'],
@@ -366,57 +433,56 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                 maturity_rating=assets.get("maturity_rating"),
                 runtime_seconds=assets.get("runtime_seconds")
             )
-
-            if not assets["video_url"] and not dummy_media_mode:
-                logger.warning(f"  └─ No video stream available for '{item['title']}'. Marking status as 'failed'.")
-                update_media_item_status(db_path, item['id'], 'failed')
-                continue
                 
             # Determine directory layout
             folder_name = item['folder_name']
-            v_url = assets.get("video_url") or ""
-            ext = ".mkv" if ".mkv" in v_url else ".mp4"
+            ext = ".mp4"
             
+            sub_lang = subtitle_langs[0] if subtitle_langs else "en"
             if item['type'] == 'movie':
                 target_dir = os.path.join(media_dir, "movies", folder_name)
                 video_filename = f"{folder_name}{ext}"
                 video_path = os.path.join(target_dir, video_filename)
                 
-                sub_lang = subtitle_langs[0] if subtitle_langs else "en"
                 sub_filename = f"{folder_name}.{sub_lang}.srt"
                 sub_path = os.path.join(target_dir, sub_filename)
+
+                nfo_dir = target_dir
+                nfo_file = "movie.nfo"
             else:
                 season_padded = extract_season_number(item['season_name'])
                 target_dir = os.path.join(media_dir, "tv", folder_name, f"Season {season_padded}")
                 video_filename = f"S{season_padded}E00 - Trailer{ext}"
                 video_path = os.path.join(target_dir, video_filename)
                 
-                sub_lang = subtitle_langs[0] if subtitle_langs else "en"
                 sub_filename = f"S{season_padded}E00 - Trailer.{sub_lang}.srt"
                 sub_path = os.path.join(target_dir, sub_filename)
+
+                nfo_dir = os.path.join(media_dir, "tv", folder_name)
+                nfo_file = "tvshow.nfo"
                 
             os.makedirs(target_dir, exist_ok=True)
+            os.makedirs(nfo_dir, exist_ok=True)
                 
             # Download or create dummy video stub
             if dummy_media_mode:
                 logger.info(f"  ├─ Dummy media mode enabled: Creating zero-byte trailer stub file at {video_path}")
                 open(video_path, 'wb').close()
             else:
-                download_file(assets["video_url"], video_path)
+                yt_url = search_and_download_youtube_trailer(
+                    item['title'],
+                    item['release_year'],
+                    video_path,
+                    fetch_subtitles=trailer_subtitles,
+                    subtitle_langs=subtitle_langs
+                )
+                if yt_url:
+                    update_media_item_tudum_metadata(db_path, item['id'], youtube_url=yt_url)
+                else:
+                    logger.warning(f"  └─ YouTube trailer download failed for '{item['title']}'. Marking status as 'failed'.")
+                    update_media_item_status(db_path, item['id'], 'failed')
+                    continue
             
-            # Download Subtitle if enabled
-            if trailer_subtitles and assets["subtitle_url"]:
-                try:
-                    logger.info(f"  ├─ Downloading WebVTT subtitles and converting to SRT at {sub_path}...")
-                    req = urllib.request.Request(assets["subtitle_url"], headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=10) as response:
-                        vtt_content = response.read().decode('utf-8')
-                    srt_content = convert_vtt_to_srt(vtt_content)
-                    with open(sub_path, "w", encoding="utf-8") as sf:
-                        sf.write(srt_content)
-                except Exception as sub_err:
-                    logger.error(f"  ├─ Failed to download/convert subtitle for {item['title']}: {sub_err}")
-                    
             # Generate and Write NFO metadata
             try:
                 plot = assets.get("plot") or f"Top 10 Netflix trailer for {item['title']}."
@@ -431,13 +497,6 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                     is_tv=is_tv
                 )
                 
-                if is_tv:
-                    nfo_dir = os.path.join(media_dir, "tv", folder_name)
-                    nfo_file = "tvshow.nfo"
-                else:
-                    nfo_dir = os.path.join(media_dir, "movies", folder_name)
-                    nfo_file = "movie.nfo"
-                    
                 logger.info(f"  ├─ Generating and writing NFO metadata ({nfo_file}) at {nfo_dir}...")
                 write_nfo_file(nfo_dir, nfo_xml, nfo_file)
             except Exception as nfo_err:

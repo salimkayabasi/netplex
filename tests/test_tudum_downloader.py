@@ -106,7 +106,7 @@ def test_extract_trailer_assets_with_fixture():
         
         assets = extract_trailer_assets("https://www.netflix.com/tudum/stranger-things")
         
-        assert assets["video_url"] == "https://tudumext.com/prod/3MSNC1IadS5jXR7VWQwe72/ST_S5_DateAnnouncement_CreelClock1.mp4"
+        assert assets["video_url"] is None
         assert assets["subtitle_url"] is None
         assert assets["plot"] is not None
         assert "When a young boy vanishes" in assets["plot"]
@@ -114,24 +114,14 @@ def test_extract_trailer_assets_with_fixture():
 
 @patch('urllib.request.urlopen')
 def test_extract_trailer_assets_custom_html(mock_urlopen):
-    # Mock HTML containing both video and subtitle tracks in double quotes
-    mock_html = """
-    <html>
-      <body>
-        <script>
-          const video = "https://example.com/assets/trailer.mp4";
-          const sub = "https://example.com/assets/subs.vtt";
-        </script>
-      </body>
-    </html>
-    """
+    mock_html = "<html><body></body></html>"
     mock_resp = MagicMock()
     mock_resp.read.return_value = mock_html.encode('utf-8')
     mock_urlopen.return_value.__enter__.return_value = mock_resp
 
     assets = extract_trailer_assets("https://www.netflix.com/tudum/custom")
-    assert assets["video_url"] == "https://example.com/assets/trailer.mp4"
-    assert assets["subtitle_url"] == "https://example.com/assets/subs.vtt"
+    assert assets["video_url"] is None
+    assert assets["subtitle_url"] is None
 
 @patch('urllib.request.urlopen')
 def test_extract_trailer_assets_failure(mock_urlopen):
@@ -169,9 +159,8 @@ def test_download_file_fallback(mock_ytdl_cls, mock_urlopen, tmp_path):
 
 @patch('src.scraper.tudum_downloader.find_tudum_page')
 @patch('src.scraper.tudum_downloader.extract_trailer_assets')
-@patch('src.scraper.tudum_downloader.download_file')
-@patch('urllib.request.urlopen')
-def test_download_pending_trailers_success(mock_urlopen, mock_download, mock_extract, mock_find, initialized_db, tmp_path):
+@patch('src.scraper.tudum_downloader.search_and_download_youtube_trailer')
+def test_download_pending_trailers_success(mock_yt_search, mock_extract, mock_find, initialized_db, tmp_path):
     # Enable subtitle downloads
     set_setting(initialized_db, "trailer_subtitles", "true")
     set_setting(initialized_db, "subtitle_languages", "en")
@@ -191,14 +180,13 @@ def test_download_pending_trailers_success(mock_urlopen, mock_download, mock_ext
     # Mock helpers
     mock_find.side_effect = lambda title, t, y: f"https://www.netflix.com/tudum/{make_slug(title)}"
     mock_extract.side_effect = [
-        {"video_url": "https://example.com/movie.mp4", "subtitle_url": "https://example.com/movie.vtt", "plot": "Movie plot", "netflix_id": "111"},
-        {"video_url": "https://example.com/show.mkv", "subtitle_url": "https://example.com/show.vtt", "plot": "Show plot", "netflix_id": "222"}
+        {"video_url": None, "subtitle_url": None, "plot": "Movie plot", "netflix_id": "111"},
+        {"video_url": None, "subtitle_url": None, "plot": "Show plot", "netflix_id": "222"}
     ]
-
-    # Mock subtitle file download content
-    mock_resp_vtt = MagicMock()
-    mock_resp_vtt.read.return_value = b"WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nHello!"
-    mock_urlopen.return_value.__enter__.return_value = mock_resp_vtt
+    mock_yt_search.side_effect = [
+        "https://www.youtube.com/watch?v=movieyt123",
+        "https://www.youtube.com/watch?v=showyt123"
+    ]
 
     media_dir = tmp_path / "media"
     
@@ -207,23 +195,15 @@ def test_download_pending_trailers_success(mock_urlopen, mock_download, mock_ext
 
     # Verify movie paths created
     movie_video = media_dir / "movies" / "Stranger Things Movie (2026)" / "Stranger Things Movie (2026).mp4"
-    movie_sub = media_dir / "movies" / "Stranger Things Movie (2026)" / "Stranger Things Movie (2026).en.srt"
     movie_nfo = media_dir / "movies" / "Stranger Things Movie (2026)" / "movie.nfo"
-    mock_download.assert_any_call("https://example.com/movie.mp4", str(movie_video))
-    assert movie_sub.exists()
-    assert "Hello!" in movie_sub.read_text()
     assert movie_nfo.exists()
     assert "<movie>" in movie_nfo.read_text()
     assert "<title>Stranger Things Movie</title>" in movie_nfo.read_text()
     assert "<uniqueid type=\"netflix\" default=\"true\">111</uniqueid>" in movie_nfo.read_text()
 
     # Verify TV paths created
-    tv_video = media_dir / "tv" / "Stranger Things Show (2026)" / "Season 05" / "S05E00 - Trailer.mkv"
-    tv_sub = media_dir / "tv" / "Stranger Things Show (2026)" / "Season 05" / "S05E00 - Trailer.en.srt"
+    tv_video = media_dir / "tv" / "Stranger Things Show (2026)" / "Season 05" / "S05E00 - Trailer.mp4"
     tv_nfo = media_dir / "tv" / "Stranger Things Show (2026)" / "tvshow.nfo"
-    mock_download.assert_any_call("https://example.com/show.mkv", str(tv_video))
-    assert tv_sub.exists()
-    assert "Hello!" in tv_sub.read_text()
     assert tv_nfo.exists()
     assert "<tvshow>" in tv_nfo.read_text()
     assert "<title>Stranger Things Show</title>" in tv_nfo.read_text()
@@ -231,7 +211,7 @@ def test_download_pending_trailers_success(mock_urlopen, mock_download, mock_ext
 
     # Verify DB statuses updated
     conn = _get_connection(initialized_db)
-    cursor = conn.execute("SELECT title, status, file_path FROM media_items")
+    cursor = conn.execute("SELECT title, status, file_path, youtube_url FROM media_items")
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
@@ -239,6 +219,7 @@ def test_download_pending_trailers_success(mock_urlopen, mock_download, mock_ext
     for r in results:
         assert r["status"] == "downloaded"
         assert r["file_path"] is not None
+        assert r["youtube_url"] is not None
 
 @patch('src.scraper.tudum_downloader.find_tudum_page')
 @patch('src.scraper.tudum_downloader.extract_trailer_assets')

@@ -17,6 +17,7 @@ from src.database import (
     set_monitored_country,
     remove_monitored_country,
     calculate_expected_total_tasks,
+    reset_stubs_and_failed_media_items,
     reset_zero_byte_media_stubs
 )
 from src.plex.auth import request_plex_pin, poll_plex_pin
@@ -238,11 +239,11 @@ async def save_settings(request: Request, background_tasks: BackgroundTasks):
             for code, formats in new_map.items():
                 set_monitored_country(db_path, code, formats)
 
-    # Check for zero-byte media stubs if dummy mode is inactive
+    # Check for zero-byte media stubs or failed items if dummy mode is inactive
     dummy_mode_active = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
     stubs_reset_count = 0
     if not dummy_mode_active:
-        reset_ids = reset_zero_byte_media_stubs(db_path)
+        reset_ids = reset_stubs_and_failed_media_items(db_path)
         stubs_reset_count = len(reset_ids)
 
     # Auto-trigger crawler if region configuration changed or dummy mode deactivated / zero-byte stubs reset
