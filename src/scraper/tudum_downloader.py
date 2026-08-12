@@ -178,6 +178,44 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         except ValueError:
             runtime_seconds = None
 
+    # Extract cast / actors
+    actors = []
+    cast_match = re.search(r'data-uia="cast"[^>]*>(.*?)</div>', content, re.DOTALL)
+    if cast_match:
+        raw_cast = re.sub(r'<[^>]+>', '', cast_match.group(1)).strip()
+        if raw_cast:
+            actors = [a.strip() for a in re.split(r'[,|;]', raw_cast) if a.strip()]
+    if not actors:
+        cast_json = re.search(r'"cast"\s*:\s*\[([^\]]+)\]', content)
+        if cast_json:
+            found_names = re.findall(r'"name"\s*:\s*"([^"]+)"', cast_json.group(1))
+            if not found_names:
+                found_names = [n.strip(' "\'') for n in cast_json.group(1).split(',')]
+            actors = [f for f in found_names if f]
+    if not actors:
+        starring_match = re.search(r'(?:Starring|Cast):\s*([^<]+)', content, re.IGNORECASE)
+        if starring_match:
+            actors = [a.strip() for a in re.split(r'[,|;]', starring_match.group(1)) if a.strip()]
+
+    # Extract directors / creators
+    directors = []
+    dir_match = re.search(r'data-uia="(?:directors|creators)"[^>]*>(.*?)</div>', content, re.DOTALL)
+    if dir_match:
+        raw_dir = re.sub(r'<[^>]+>', '', dir_match.group(1)).strip()
+        if raw_dir:
+            directors = [d.strip() for d in re.split(r'[,|;]', raw_dir) if d.strip()]
+    if not directors:
+        dir_json = re.search(r'"(?:directors|creators)"\s*:\s*\[([^\]]+)\]', content)
+        if dir_json:
+            found_dirs = re.findall(r'"name"\s*:\s*"([^"]+)"', dir_json.group(1))
+            if not found_dirs:
+                found_dirs = [n.strip(' "\'') for n in dir_json.group(1).split(',')]
+            directors = [f for f in found_dirs if f]
+    if not directors:
+        creator_match = re.search(r'(?:Directed by|Created by|Directors?|Creators?):\s*([^<]+)', content, re.IGNORECASE)
+        if creator_match:
+            directors = [d.strip() for d in re.split(r'[,|;]', creator_match.group(1)) if d.strip()]
+
     return {
         "video_url": video_url,
         "subtitle_url": subtitle_url,
@@ -186,7 +224,9 @@ def extract_trailer_assets(tudum_url: str | None) -> dict:
         "poster_url": poster_url,
         "logo_url": logo_url,
         "maturity_rating": maturity_rating,
-        "runtime_seconds": runtime_seconds
+        "runtime_seconds": runtime_seconds,
+        "actors": actors,
+        "directors": directors
     }
 
 def download_file(url: str, output_path: str):
@@ -215,10 +255,17 @@ def download_file(url: str, output_path: str):
                     break
                 out_file.write(chunk)
 
-def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float:
+def score_trailer_candidate(
+    entry: dict,
+    title: str,
+    release_year: int,
+    actors: list[str] = None,
+    directors: list[str] = None
+) -> float:
     """
     Scores a YouTube candidate video entry for how well it matches the desired trailer.
     Returns a score float. Scores below 25.0 are considered non-matching/disqualified.
+    Gives negative score (-999.0) if content is marked as AI generated or concept fan video.
     """
     if not entry or not isinstance(entry, dict):
         return -999.0
@@ -256,7 +303,25 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
 
     score = 0.0
 
-    # 2. Negative Term Filtering (Disqualification / Heavy Penalties)
+    # 2. AI-Generated & Fake/Fan Content Disqualification (Negative Score)
+    ai_phrases = [
+        'ai generated', 'ai-generated', 'ai concept', 'ai trailer', 'ai voice', 'ai version',
+        'ai remastered', 'ai remake', 'ai animation', 'ai movie', 'made with ai', 'ai fan',
+        'artificial intelligence', 'midjourney', 'sora ai', 'elevenlabs', 'runway gen',
+        'kling ai', 'pika ai', 'luma ai', 'dall-e', 'dalle'
+    ]
+    v_tags = [str(t).lower() for t in (entry.get('tags') or [])]
+    v_cats = [str(c).lower() for c in (entry.get('categories') or [])]
+    combined_meta = f"{norm_candidate} {norm_uploader} {norm_desc} {' '.join(v_tags)} {' '.join(v_cats)}"
+
+    if 'ai' not in norm_target and 'artificial intelligence' not in norm_target:
+        for phrase in ai_phrases:
+            if phrase in combined_meta:
+                return -999.0
+        if re.search(r'\bai\b', combined_meta) and any(w in combined_meta for w in ['concept', 'trailer', 'remake', 'fan', 'voice', 'teaser', 'generated']):
+            return -999.0
+
+    # 3. Negative Term Filtering (Disqualification / Heavy Penalties)
     negative_terms = [
         'iphone', 'apple', 'samsung', 'galaxy', 'pixel', 'pro max', 'macbook', 'ipad', 'unboxing', 'gadget',
         'reaction', 'review', 'gameplay', 'walkthrough', 'lets play', "let's play", 'breakdown', 'ending explained',
@@ -270,7 +335,7 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
         if neg in norm_candidate or neg in norm_uploader:
             return -999.0
 
-    # 3. Title Matching Score
+    # 4. Title Matching Score
     if norm_target in norm_candidate:
         score += 35.0
     elif target_words.issubset(candidate_words):
@@ -279,7 +344,7 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
         word_match_ratio = len(matching_words) / len(target_words)
         score += word_match_ratio * 20.0
 
-    # 4. Trailer / Teaser Keyword Score
+    # 5. Trailer / Teaser Keyword Score
     if 'official trailer' in norm_candidate:
         score += 25.0
     elif 'teaser trailer' in norm_candidate or 'official teaser' in norm_candidate:
@@ -287,7 +352,7 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
     elif any(kw in norm_candidate for kw in ['trailer', 'teaser', 'first look', 'sneak peek', 'preview']):
         score += 15.0
 
-    # 5. Release Year Bonus
+    # 6. Release Year Bonus
     year_str = str(release_year)
     prev_year_str = str(release_year - 1)
     next_year_str = str(release_year + 1)
@@ -296,7 +361,7 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
     elif prev_year_str in norm_candidate or next_year_str in norm_candidate:
         score += 10.0
 
-    # 6. Channel / Publisher Trust Bonus
+    # 7. Channel / Publisher Trust Bonus
     netflix_channels = ['netflix', 'netflix india', 'netflix asia', 'netflix uk', 'netflix anime', 'netflix jr']
     major_distributors = [
         'warner', 'sony pictures', 'universal pictures', 'paramount', 'disney', 'marvel', 'a24', 'hbo',
@@ -312,7 +377,7 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
     elif any(ch in norm_uploader for ch in generic_trailer_channels):
         score += 10.0
 
-    # 7. Video Duration Verification
+    # 8. Video Duration Verification
     if v_duration is not None:
         try:
             d = float(v_duration)
@@ -329,6 +394,29 @@ def score_trailer_candidate(entry: dict, title: str, release_year: int) -> float
         except (ValueError, TypeError):
             pass
 
+    # 9. Actor & Director Verification Bonus
+    if actors:
+        actor_matches = 0
+        for actor in actors:
+            norm_actor = re.sub(r'[^\w\s]', '', actor.lower()).strip()
+            if not norm_actor or len(norm_actor) < 3:
+                continue
+            if norm_actor in norm_candidate or norm_actor in norm_desc or norm_actor in norm_uploader or any(norm_actor in t for t in v_tags):
+                actor_matches += 1
+        if actor_matches > 0:
+            score += min(actor_matches * 15.0, 30.0)
+
+    if directors:
+        director_matches = 0
+        for director in directors:
+            norm_dir = re.sub(r'[^\w\s]', '', director.lower()).strip()
+            if not norm_dir or len(norm_dir) < 3:
+                continue
+            if norm_dir in norm_candidate or norm_dir in norm_desc or norm_dir in norm_uploader or any(norm_dir in t for t in v_tags):
+                director_matches += 1
+        if director_matches > 0:
+            score += min(director_matches * 20.0, 30.0)
+
     return score
 
 
@@ -337,7 +425,9 @@ def search_and_download_youtube_trailer(
     release_year: int,
     output_path: str,
     fetch_subtitles: bool = False,
-    subtitle_langs: list[str] = None
+    subtitle_langs: list[str] = None,
+    actors: list[str] = None,
+    directors: list[str] = None
 ) -> str | None:
     """
     Searches YouTube for official trailer using yt-dlp, saves to output_path,
@@ -353,8 +443,14 @@ def search_and_download_youtube_trailer(
         f'ytsearch5:{clean_title} {release_year} Netflix official trailer',
         f'ytsearch5:{clean_title} {release_year} official trailer',
         f'ytsearch5:{clean_title} official trailer',
-        f'ytsearch5:{clean_title} trailer'
     ]
+    if actors and len(actors) > 0 and actors[0]:
+        clean_actor = re.sub(r'[\"\']', '', actors[0]).strip()
+        queries.append(f'ytsearch5:{clean_title} {clean_actor} official trailer')
+    if directors and len(directors) > 0 and directors[0]:
+        clean_dir = re.sub(r'[\"\']', '', directors[0]).strip()
+        queries.append(f'ytsearch5:{clean_title} {clean_dir} official trailer')
+    queries.append(f'ytsearch5:{clean_title} trailer')
     
     best_entry = None
     best_score = -999.0
@@ -383,7 +479,7 @@ def search_and_download_youtube_trailer(
                         if e_id:
                             seen_ids.add(e_id)
 
-                        cand_score = score_trailer_candidate(entry, title, release_year)
+                        cand_score = score_trailer_candidate(entry, title, release_year, actors=actors, directors=directors)
                         cand_title = entry.get('title', 'Unknown Title')
                         cand_uploader = entry.get('uploader') or entry.get('channel', 'Unknown Channel')
 
@@ -654,7 +750,9 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
                     item['release_year'],
                     video_path,
                     fetch_subtitles=trailer_subtitles,
-                    subtitle_langs=subtitle_langs
+                    subtitle_langs=subtitle_langs,
+                    actors=assets.get("actors"),
+                    directors=assets.get("directors")
                 )
                 if yt_url:
                     update_media_item_tudum_metadata(db_path, item['id'], youtube_url=yt_url)

@@ -286,3 +286,50 @@ def test_score_trailer_candidate_filters_generic_happy_content():
     assert vlog_score < 25.0
     assert trailer_score >= 50.0
 
+
+def test_score_trailer_candidate_disqualifies_ai_content():
+    # Candidate with AI concept / generated markers in title, description, or tags
+    ai_candidate_1 = {
+        "title": "Spider-Man 4 AI Concept Trailer | Midjourney",
+        "uploader": "Concept Central",
+        "description": "Made with AI voice and Midjourney graphics",
+        "duration": 120
+    }
+    ai_candidate_2 = {
+        "title": "Gladiator II Official Teaser",
+        "uploader": "AI Trailers Channel",
+        "tags": ["sora ai", "ai generated", "trailer"],
+        "duration": 110
+    }
+    official_trailer = {
+        "title": "Gladiator II | Official Trailer | Paramount Pictures",
+        "uploader": "Paramount Pictures",
+        "description": "Official trailer for Gladiator II (2024)",
+        "duration": 140
+    }
+
+    assert score_trailer_candidate(ai_candidate_1, "Spider-Man 4", 2026) == -999.0
+    assert score_trailer_candidate(ai_candidate_2, "Gladiator II", 2024) == -999.0
+    assert score_trailer_candidate(official_trailer, "Gladiator II", 2024) >= 50.0
+
+
+def test_score_trailer_candidate_boosts_actors_and_directors():
+    matching_cast_candidate = {
+        "title": "Anora | Official Trailer | Starring Mikey Madison",
+        "uploader": "NEON",
+        "description": "Directed by Sean Baker, starring Mikey Madison",
+        "duration": 130
+    }
+
+    base_score = score_trailer_candidate(matching_cast_candidate, "Anora", 2024)
+    boosted_score = score_trailer_candidate(
+        matching_cast_candidate,
+        "Anora",
+        2024,
+        actors=["Mikey Madison"],
+        directors=["Sean Baker"]
+    )
+
+    assert boosted_score >= base_score + 35.0
+
+
