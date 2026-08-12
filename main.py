@@ -4,7 +4,7 @@ import uvicorn
 from src.database import init_db
 from src.scheduler import start_scheduler
 from src.web.app import app, download_and_cache_tudum_css, ensure_config_www_mounted
-from src.logger import get_logger
+from src.logger import setup_logger, get_logger
 
 logger = get_logger("netplex.main")
 
@@ -18,8 +18,13 @@ async def main():
     config_dir = os.environ.get("NETPLEX_CONFIG_DIR", "/config")
     host = os.environ.get("NETPLEX_HOST", "0.0.0.0")
     port = int(os.environ.get("NETPLEX_PORT", "8000"))
+    log_level = os.environ.get("NETPLEX_LOG_LEVEL", "INFO")
+
+    log_file = os.path.join(config_dir, "netplex.log")
+    setup_logger(log_level=log_level, log_file=log_file)
 
     logger.info("Initializing NetPlex application...")
+
     
     # Initialize SQLite database schema
     init_db(db_path)
