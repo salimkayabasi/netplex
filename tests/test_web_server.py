@@ -58,6 +58,7 @@ def test_landing_page_endpoint(test_env):
     assert "Stranger Things" in response.text
     assert "NetPlex" in response.text
     assert 'class="rank-badge">01</div>' in response.text or '01' in response.text
+    assert 'badge-status status-pending' in response.text
 
 def test_sequential_country_sections(test_env):
     client = test_env["client"]

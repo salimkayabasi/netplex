@@ -63,6 +63,19 @@
                         {% if item.season_name %}
                         <span>• {{ item.season_name }}</span>
                         {% endif %}
+                        {% if item.status %}
+                        <span class="badge-status status-{{ item.status }}" title="Video status: {{ item.status }}">
+                            {% if item.status == 'downloaded' %}
+                                {% if dummy_media_mode %}📄 Stub{% else %}🟢 Ready{% endif %}
+                            {% elif item.status == 'pending' %}
+                                ⏳ Pending
+                            {% elif item.status == 'failed' %}
+                                ⚠️ Failed
+                            {% else %}
+                                ℹ️ {{ item.status | capitalize }}
+                            {% endif %}
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
             </div>

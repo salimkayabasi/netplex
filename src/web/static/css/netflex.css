@@ -328,6 +328,37 @@ body {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    line-height: 1;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.badge-status.status-downloaded {
+    background-color: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.badge-status.status-pending {
+    background-color: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.3);
+}
+
+.badge-status.status-failed {
+    background-color: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
 /* Modal Overlay */
 .modal-backdrop {
     position: fixed;
