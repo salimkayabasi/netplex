@@ -186,6 +186,14 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.media-card.dummy-mode {
+    cursor: default;
+}
+
+.media-card.dummy-mode .play-overlay {
+    display: none !important;
+}
+
 .media-card:hover {
     transform: scale(1.04);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);

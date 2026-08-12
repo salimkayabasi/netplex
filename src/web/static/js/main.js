@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Open video trailer modal
     window.openTrailerModal = (itemId, title) => {
+        if (window.DUMMY_MEDIA_MODE) {
+            console.log('Dummy media mode enabled: trailer player UI disabled.');
+            return;
+        }
         if (!modalBackdrop || !videoPlayer) return;
         
         if (modalTitle) {

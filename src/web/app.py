@@ -11,7 +11,8 @@ from fastapi.templating import Jinja2Templates
 from src.database import (
     _get_connection,
     get_monitored_countries,
-    get_active_rankings
+    get_active_rankings,
+    get_setting
 )
 
 logger = logging.getLogger(__name__)
@@ -175,6 +176,12 @@ def landing_page(
 
     primary_rankings = country_sections[0]["rankings"] if country_sections else []
 
+    dummy_media_mode = False
+    try:
+        dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    except Exception:
+        pass
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -183,7 +190,8 @@ def landing_page(
             "selected_category": category,
             "current_week": latest_week,
             "rankings": primary_rankings,
-            "country_sections": country_sections
+            "country_sections": country_sections,
+            "dummy_media_mode": dummy_media_mode
         }
     )
 
@@ -194,6 +202,12 @@ def stream_video(
     range: Optional[str] = Header(None)
 ):
     db_path = get_db_path(request)
+
+    dummy_media_mode = False
+    try:
+        dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
+    except Exception:
+        pass
     
     # Query file_path for media_item
     file_path = None
@@ -219,6 +233,9 @@ def stream_video(
         raise HTTPException(status_code=403, detail="Access denied: Invalid media path")
 
     file_size = os.path.getsize(file_path)
+
+    if dummy_media_mode or file_size == 0:
+        raise HTTPException(status_code=400, detail="Dummy media mode enabled: video streaming unavailable for zero-byte media stubs")
 
     if range:
         # Parse range header: e.g. "bytes=0-1023"

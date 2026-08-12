@@ -3,6 +3,10 @@
 {% block title %}NetPlex - Netflix Top 10{% endblock %}
 
 {% block content %}
+<script>
+    window.DUMMY_MEDIA_MODE = {{ 'true' if dummy_media_mode else 'false' }};
+</script>
+
 <div class="top-controls-bar">
     <div class="category-toggle-container">
         <a href="/?category=Movies" 
@@ -33,7 +37,7 @@
         {% if section.rankings %}
         <div class="ranking-grid">
             {% for item in section.rankings %}
-            <div class="media-card" onclick="openTrailerModal({{ item.media_item_id }}, '{{ item.title | escape }}')">
+            <div class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}" {% if not dummy_media_mode %}onclick="openTrailerModal({{ item.media_item_id }}, '{{ item.title | escape }}')"{% endif %}>
                 <div class="rank-badge">{% if item.rank < 10 %}0{{ item.rank }}{% else %}{{ item.rank }}{% endif %}</div>
                 <div class="card-poster">
                     {% if item.poster_url %}
@@ -43,9 +47,11 @@
                         <span class="poster-title">{{ item.title }}</span>
                     </div>
                     {% endif %}
+                    {% if not dummy_media_mode %}
                     <div class="play-overlay">
                         <div class="play-btn-circle">▶</div>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="card-info">
                     <div class="card-title" title="{% if item.local_title and item.local_title.strip().lower() != item.title.strip().lower() %}{{ item.title }} / {{ item.local_title }}{% else %}{{ item.title }}{% endif %}">

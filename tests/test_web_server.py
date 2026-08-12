@@ -179,3 +179,47 @@ def test_stream_video_endpoint(test_env, monkeypatch):
     resp_404 = client.get("/stream/video/99999")
     assert resp_404.status_code == 404
 
+
+def test_dummy_media_mode_ui_and_stream(test_env, monkeypatch):
+    client = test_env["client"]
+    db_path = test_env["db_path"]
+    tmpdir = test_env["tmpdir"]
+
+    from src.database import set_setting, update_media_item_status
+
+    data_dir = os.path.join(tmpdir, "media")
+    os.makedirs(data_dir, exist_ok=True)
+    monkeypatch.setenv("NETPLEX_DATA_DIR", data_dir)
+
+    set_monitored_country(db_path, "US", "movie")
+    item_id = upsert_media_item(db_path, "Stub Movie", "movie", 2026, None, "Stub Movie (2026)")
+    insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item_id)
+
+    # Create a 0-byte video stub file
+    stub_file = os.path.join(data_dir, "stub.mp4")
+    open(stub_file, "wb").close()
+    update_media_item_status(db_path, item_id, "downloaded", file_path=stub_file)
+
+    # 1. When dummy_media_mode is false (default)
+    set_setting(db_path, "dummy_media_mode", "false")
+    resp_normal = client.get("/")
+    assert resp_normal.status_code == 200
+    assert "window.DUMMY_MEDIA_MODE = false;" in resp_normal.text
+    assert 'onclick="openTrailerModal(' in resp_normal.text
+    assert 'class="play-overlay"' in resp_normal.text
+
+    # 2. When dummy_media_mode is true
+    set_setting(db_path, "dummy_media_mode", "true")
+    resp_dummy = client.get("/")
+    assert resp_dummy.status_code == 200
+    assert "window.DUMMY_MEDIA_MODE = true;" in resp_dummy.text
+    assert 'class="media-card dummy-mode"' in resp_dummy.text
+    assert 'onclick="openTrailerModal(' not in resp_dummy.text
+    assert 'class="play-overlay"' not in resp_dummy.text
+
+    # 3. Stream endpoint when dummy_media_mode is true or file size is 0
+    resp_stream = client.get(f"/stream/video/{item_id}")
+    assert resp_stream.status_code == 400
+    assert "Dummy media mode" in resp_stream.json()["detail"]
+
+
