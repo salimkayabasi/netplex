@@ -14,6 +14,10 @@ from src.database import (
 from src.crawler_lock import set_crawl_progress
 import http.client
 import json
+import time
+from src.logger import get_logger
+
+logger = get_logger("netplex.crawler")
 
 COUNTRY_SLUGS = {
     'GLOBAL': '', 'US': 'united-states', 'GB': 'united-kingdom',
@@ -128,9 +132,12 @@ def fetch_top10_tsv(url: str, cache_path: str, force_refresh: bool = False) -> s
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
         
+    filename = os.path.basename(cache_path)
     if not force_refresh and os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        logger.info(f"Using cached TSV file: {filename}")
         return cache_path
 
+    logger.info(f"Downloading TSV file from {url}...")
     tmp_path = cache_path + ".tmp"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:
@@ -142,6 +149,7 @@ def fetch_top10_tsv(url: str, cache_path: str, force_refresh: bool = False) -> s
                 out_file.write(chunk)
         if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
             os.replace(tmp_path, cache_path)
+            logger.info(f"Successfully downloaded TSV file: {filename}")
     except Exception as e:
         if os.path.exists(tmp_path):
             try:
@@ -376,14 +384,18 @@ def cleanup_tsv_cache(cache_dir: str):
     """Removes TSV files and temporary cache files from cache_dir."""
     if not os.path.exists(cache_dir):
         return
-    for filename in os.listdir(cache_dir):
-        if filename.endswith(".tsv") or filename.endswith(".tmp"):
-            file_path = os.path.join(cache_dir, filename)
-            try:
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-            except OSError as e:
-                logger.warning(f"Failed to remove cached file {file_path}: {e}")
+    tsv_files = [f for f in os.listdir(cache_dir) if f.endswith(".tsv") or f.endswith(".tmp")]
+    if not tsv_files:
+        return
+    logger.info(f"Removing TSV files from {cache_dir}...")
+    for filename in tsv_files:
+        file_path = os.path.join(cache_dir, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                logger.info(f"  └─ Removed TSV file: {filename}")
+        except OSError as e:
+            logger.warning(f"Failed to remove cached file {file_path}: {e}")
 
 def get_cache_dir(db_path: str) -> str:
     """Resolves the cache directory from NETPLEX_CACHE_DIR environment variable or fallback paths."""
@@ -492,17 +504,25 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
             tv_shows = [item for item in items if item['category'] == 'TV']
 
             if "Movies" in content_types and movies:
+                movies.sort(key=lambda x: x['rank'])
                 logger.info("Fetching Movies")
+                logger.info(f"Top 10 Movies ({cc}):")
+                for item in movies[:10]:
+                    logger.info(f"  #{item['rank']:02d}: {item['title']}")
                 for item in movies:
-                    logger.info(f"Fetching {item['title']}")
+                    logger.info(f"Fetching #{item['rank']}: {item['title']}")
                     _save_crawled_item(db_path, item, cc, latest_week, meta_map)
                     total_movies_crawled += 1
                     total_rankings_synchronized += 1
 
             if "TV Shows" in content_types and tv_shows:
+                tv_shows.sort(key=lambda x: x['rank'])
                 logger.info("Fetching TV Shows")
+                logger.info(f"Top 10 TV Shows ({cc}):")
+                for item in tv_shows[:10]:
+                    logger.info(f"  #{item['rank']:02d}: {item['title']}")
                 for item in tv_shows:
-                    logger.info(f"Fetching {item['title']}")
+                    logger.info(f"Fetching #{item['rank']}: {item['title']}")
                     _save_crawled_item(db_path, item, cc, latest_week, meta_map)
                     total_tv_crawled += 1
                     total_rankings_synchronized += 1

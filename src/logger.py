@@ -60,7 +60,10 @@ def setup_logger(log_level: str = None, log_file: str = None, log_filter: str = 
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
     if log_filter:
-        console_handler.addFilter(LoggerFilter(log_filter))
+        filter_obj = LoggerFilter(log_filter)
+        console_handler.addFilter(filter_obj)
+        for uvicorn_logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+            logging.getLogger(uvicorn_logger_name).addFilter(filter_obj)
     logger.addHandler(console_handler)
 
     # Rotating File Handler
