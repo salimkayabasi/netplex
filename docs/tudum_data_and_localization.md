@@ -1,6 +1,6 @@
 # Netflix Tudum Data Availability & Content Localization Guide
 
-This document details all metadata fields accessible directly from the Netflix Tudum portal per content type (Movies & TV Shows) and outlines the strategy for retrieving localized content titles (e.g., Turkish names).
+This document details all metadata fields accessible directly from the Netflix Tudum portal per content type (Movies & TV Shows) and outlines the strategy for retrieving localized content titles in their native regional languages.
 
 ---
 
@@ -54,25 +54,21 @@ Netflix Tudum exposes data through two primary mechanisms:
 
 ---
 
-## 2. Localization & Turkish Content Names
+## 2. Localization & Native Content Names
 
-### Is Localized Data (Turkish Names) Available Directly from Netflix Tudum?
-**No.** Netflix Tudum Top 10 global pages and TSV data files publish titles **exclusively in English**, even on country-specific pages such as `https://www.netflix.com/tudum/top10/turkey`.
+### Is Localized Data (Native Language Titles) Available Directly from Netflix Tudum?
+**No.** Netflix Tudum Top 10 global pages and TSV data files publish titles **exclusively in English**, even on country-specific pages.
 
-### Recommended Strategy to Fetch Turkish Content Names
-To display authentic Turkish titles (e.g. *"Mutlu Muyuz?"* for *"Are We Happy?"*) alongside the global English names, the following secondary sources/fallback options are used:
+### Strategy to Fetch Native Regional Titles
+To display authentic localized titles in the native language of the target region alongside the global English names, the following secondary sources/fallback options are used:
 
-1. **TMDB (The Movie Database) Search API**:
-   - **Endpoint**: `/search/movie` or `/search/tv` with `language=tr-TR` and `year=<release_year>`.
-   - **Accuracy**: Extremely high (~98%). Provides official Turkish title (`title` / `name`), localized poster artwork, overview, and genre details.
+1. **Netflix Title Page Scraper with Locale Headers**:
+   - Querying `https://www.netflix.com/<country_code>/title/<netflix_id>` with HTTP headers matching the target locale (e.g., `Accept-Language: <country_code>`).
+   - Extracts localized title tags (`<meta property="og:title">` or `<h1>`).
 
-2. **Netflix Title Page Scraper with Locale Headers**:
-   - Querying `https://www.netflix.com/tr/title/<netflix_id>` or `https://www.netflix.com/title/<netflix_id>` with HTTP headers:
-     `Accept-Language: tr-TR,tr;q=0.9`
-   - Extracts the `<meta property="og:title">` or `<h1>` tag in Turkish.
-
-3. **OMDB / JustWatch / Wikidata Fallback**:
-   - Used when TMDB or Netflix title page scraping returns no result for obscure or newly added local titles.
+2. **TMDB (The Movie Database) Search API**:
+   - Querying `/search/movie` or `/search/tv` with the target country locale code.
+   - Provides localized title (`title` / `name`), localized poster artwork, and localized overview.
 
 ---
 
@@ -84,7 +80,7 @@ NetPlex stores localized titles in the `media_items` table:
 CREATE TABLE media_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,          -- Primary English Title (from Tudum)
-    local_title TEXT,             -- Localized Title (e.g., Turkish Title)
+    local_title TEXT,             -- Localized Title (in region's native language)
     type TEXT NOT NULL,           -- 'movie' or 'tv'
     release_year INTEGER NOT NULL,
     season_name TEXT,
@@ -96,4 +92,5 @@ CREATE TABLE media_items (
 ```
 
 When `local_title` is present and differs from `title`, NetPlex renders both titles in the format:
-`Original Title / Local Title` (e.g. `Are We Happy? / Mutlu Muyuz?`).
+`Original Title / Local Title`.
+

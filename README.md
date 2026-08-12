@@ -1,13 +1,16 @@
 # NetPlex 🎬🍿
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Vibecoded with Gemini 3.6 Flash](https://img.shields.io/badge/Vibecoded%20with-Gemini%203.6%20Flash-8E7CC3.svg)](https://deepmind.google/technologies/gemini/)
 
 **NetPlex** is a Docker-based scraper and metadata synchronization utility that connects Netflix's weekly Top 10 rankings directly to your Plex Media Server.
 
-It runs as a background Docker container, downloading the latest Netflix Top 10 charts, extracting trailer videos and subtitles directly from public Netflix CDNs, and organizing them in a flat, Plex-optimized format. It also integrates with the Plex API to synchronize lists directly as custom Plex Collections or Playlists.
+It runs as a background Docker container, fetching the latest weekly Netflix Top 10 charts, downloading trailer videos (via `yt-dlp`) or generating zero-byte dummy stubs, and organizing them in a flat, Plex-optimized format. It also integrates with the Plex API to synchronize lists directly as custom Plex Collections or Playlists.
+
+> **⚡ Built with AI**: Proudly vibecoded using **Gemini 3.6 Flash**.
 
 > **⚖️ Formal Legal Notice & Disclaimer**:  
-> **Non-Commercial Hobby Project**: NetPlex was created strictly as a non-commercial hobby and experimental personal project. There are no plans, intentions, or recommendations to commercialize, monetize, or offer this software as a enterprise/commercial service.  
+> **Non-Commercial Hobby Project**: NetPlex was created strictly as a non-commercial hobby and experimental personal project. There are no plans, intentions, or recommendations to commercialize, monetize, or offer this software as an enterprise/commercial service.  
 > **Copyright & Content Rights**: Unauthorized downloading, copying, or distribution of copyrighted or private media content without explicit authorization from rights holders is illegal. NetPlex is designed strictly to operate on publicly accessible metadata and promotional trailer assets.  
 > **Assumption of Risk & Liability**: Anyone using, deploying, or modifying this repository for any purpose does so **entirely at their own risk**. The authors, maintainers, and contributors explicitly disclaim all liability and legal responsibility for any misuse, policy violations, or damages resulting from the use of this software.
 
@@ -15,15 +18,18 @@ It runs as a background Docker container, downloading the latest Netflix Top 10 
 
 ## 🚀 Key Features
 
-* 📊 **Latest Netflix Top 10 Data**: Scrapes weekly country-specific and global datasets from the Netflix Top 10 portal, focusing exclusively on the latest week's updates.
-* 🖥️ **Tudum-Aesthetic 2-Page Web UI**: Exposes an unauthenticated dashboard on port `8000`:
-  * **Landing Page**: Replicates the premium visual identity of Netflix Tudum (using cached local CSS). Displays the active country/global rankings in the exact order as Netflix. Works standalone without requiring Plex.
-  * **Settings Page**: Manage monitored countries, toggle formats using checkboxes or radio buttons, and link Plex via OAuth.
-* 🎥 **Direct Netflix Trailer Scraping**: Fetches public trailer videos (`.mp4` / `.mkv`) and subtitles (`.srt`) directly from Netflix's editorial CDNs (Tudum) rather than relying on YouTube crawlers.
-* 📁 **Plex-Lean Library Directory**: Organizes media into standard, flat `movies/` and `tv/` subfolders mapped directly to Plex. TV show trailers are intelligently mapped as Season Specials (`SXXE00`) to maintain a clean layout.
-* 🧹 **Auto-Cleanup Daemon**: Automatically deletes files and directories for items that drop out of the weekly Top 10 list, keeping your disk footprint lean.
-* 🔌 **Plex API Integration**: Fuzzy-matches titles in the Top 10 against your existing libraries to build and re-order custom Plex Collections/Playlists.
-* 🛡️ **Offline-Resilient Workflow**: Media parsing, downloading, and local file storage are executed first. Plex synchronization follows as a secondary step; if Plex is disconnected or credentials expire, your local media folder remains intact.
+* 📊 **Fetch Latest Weekly Top 10 Lists**: Scrapes weekly country-specific and global datasets from the Netflix Top 10 portal, focusing exclusively on the latest week's updates.
+* 🖥️ **Tudum-Aesthetic Web UI**: Exposes an unauthenticated dashboard on port `8000`:
+  * **Landing Page**: Replicates the visual identity of Netflix Tudum (using cached local CSS). Displays active country/global rankings in the exact order as Netflix. Works standalone without requiring Plex.
+  * **Settings Page**: Manage monitored countries, configure Cron update schedules, toggle content formats, and link Plex via OAuth.
+* 🎥 **Trailer Downloader Engine & Dummy File Mode**:
+  * Uses `yt-dlp` to fetch promotional trailers and subtitle tracks (`.srt`).
+  * **Optional Zero-Byte Dummy Trailers**: Supports creating fake 0-byte `.mp4`/`.mkv` files to mimic trailer downloads, allowing Plex to index items and build collections without consuming disk space or bandwidth.
+* 📁 **Plex-Lean Library Directory**: Organizes media into standard, flat `movies/` and `tv/` subfolders mapped directly to a **dedicated Plex library**. TV show trailers are intelligently mapped as Season Specials (`SXXE00`) to maintain a clean layout.
+* 🧹 **Auto-Cleanup & Tiny Database Footprint**: Only maintains the latest week's Top 10 dataset from Tudum, keeping SQLite database storage extremely small and automatically pruning old files.
+* 🔌 **Plex API Integration**: Recommends setting up a **separate dedicated library** (e.g. *Netflix Top 10*) without merging into existing libraries. Fuzzy-matches titles in the Top 10 against your library to build custom Plex Collections/Playlists.
+* ⏱️ **Cron-Based Scheduling**: Uses flexible Cron expressions (defaults to `0 0 * * 2` for weekly Tuesday runs when Netflix updates data) instead of rigid fixed intervals.
+* 🛡️ **Offline-Resilient Workflow**: Media parsing and local file storage execute first. Plex synchronization follows as a secondary step; if Plex is disconnected or credentials expire, your local media folder remains intact.
 
 ---
 

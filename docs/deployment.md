@@ -159,6 +159,7 @@ services:
 | `NETPLEX_DATA_DIR` | Path to downloaded media files (`movies/` & `tv/`) | `/data` | `./media` or `./data` |
 | `NETPLEX_HOST` | Web server bind IP address | `0.0.0.0` | `0.0.0.0` or `127.0.0.1` |
 | `NETPLEX_PORT` | Web server listening port | `8000` | `8000` |
+| `NETPLEX_CRON_SCHEDULE` | Cron expression for weekly updates | `0 0 * * 2` | `0 0 * * 2` |
 | `PYTHONUNBUFFERED` | Disable Python print log buffering | `1` | `1` |
 
 ---

@@ -112,39 +112,34 @@ erDiagram
 Stores general global settings editable via the Web UI:
 * `plex_url`: The address of the Plex Media Server.
 * `plex_token`: The authenticated Plex API token.
-* `update_interval_hours`: Frequency of scraper executions.
-* `log_level`: Level of detail in the execution logs.
+* `cron_expression`: Standard 5-field Cron expression for scraper runs (defaults to `0 0 * * 2` for weekly Tuesday runs).
+* `log_level`: Level of detail in execution logs.
+* `dummy_media_mode`: Flag (`true`/`false`) to generate zero-byte `.mp4` dummy files instead of downloading full video streams.
 
 ### 2. `monitored_countries` Table
-Stores countries currently monitored by the scraper:
-* `country_code` (e.g. `TR`, `US`).
+Stores country-specific formats:
+* `country_code` (e.g. `US`, `DE`).
 * `formats`: `movies`, `tv`, or `both`.
 
 ### 3. `media_items` Table
-Tracks unique movies and series downloaded on disk, ensuring files are not duplicated even if they appear in multiple country rankings:
+Tracks unique movies and series downloaded on disk:
 * `id` (Primary Key).
 * `title`: Title of the movie or show.
 * `type`: `movie` or `tv`.
 * `release_year`: Extracted release year.
-* `season_name`: Extracted season name (e.g., `Season 1`, empty for movies).
+* `season_name`: Extracted season name (e.g. `Season 1`).
 * `folder_name`: Name of the directory on disk (e.g., `Stranger Things (2016)`).
 * `status`: `pending`, `downloaded`, or `failed`.
 * `last_seen_at`: Timestamp of the last time this item appeared in any active Top 10 list.
 
-### 4. `rankings` Table
-Tracks weekly rankings:
-* `id` (Primary Key).
-* `country_code` (e.g. `US`, `TR`).
-* `category` (e.g. `Films`, `TV`).
-* `rank` (1 to 10).
-* `week` (e.g., `2026-08-09`).
-* `media_item_id` (Foreign Key referencing `media_items.id`).
+> [!NOTE]
+> **Database Footprint & Cleanup**: NetPlex only stores and monitors data for the **latest week's Top 10 charts**. Older week records and dropped media files are pruned automatically by the cleanup daemon, keeping SQLite database storage and disk space footprint minimal.
 
 ---
 
 ## 🔄 Execution Sequence & Resiliency
 
-NetPlex prioritizes keeping local media updated before interacting with Plex. If Plex is unavailable or offline, the local database and files remain fully functional.
+NetPlex prioritizes keeping local media updated before interacting with Plex. We strongly recommend pointing NetPlex to a **dedicated, separate Plex library** (e.g. `Netflix Top 10`) rather than merging with existing main media libraries. If Plex is unavailable or offline, the local database and files remain fully functional.
 
 ```mermaid
 sequenceDiagram
@@ -155,16 +150,19 @@ sequenceDiagram
     participant FS as Local Filesystem
     participant PL as Plex API
     
-    CR->>DB: Load settings (Monitored countries, formats)
+    CR->>DB: Load settings (Monitored countries, Cron schedule)
     DB-->>CR: Config Data
     CR->>NF: Fetch latest weekly Top 10 lists
     NF-->>CR: Weekly Top 10 Data
     CR->>DB: Update rankings & identify new items
     
     loop For each new Top 10 item
-        CR->>NF: Parse Tudum article/details for video & subtitles
-        NF-->>CR: Direct CDN video/subtitle URLs (.mp4 & .vtt)
-        CR->>FS: Write files (movies/ or tv/)
+        CR->>NF: Parse trailer metadata (yt-dlp engine)
+        alt Dummy Media Mode Enabled
+            CR->>FS: Touch 0-byte video stub (.mp4 & .nfo)
+        else Full Download Mode
+            CR->>FS: Download video & subtitle files via yt-dlp
+        end
         CR->>DB: Mark item as 'downloaded'
     end
     
@@ -174,7 +172,7 @@ sequenceDiagram
     
     critical Try Plex Sync
         CR->>PL: Connect with Plex Token
-        PL-->>CR: Session OK
+        PL-->>CR: Session OK (Target Separate Library)
         CR->>PL: Find matching library titles
         CR->>PL: Rebuild and order Collections (1 to 10)
     option Plex Offline / Token Expired

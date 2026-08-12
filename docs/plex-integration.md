@@ -1,12 +1,15 @@
 # Plex Media Server Integration Guide 🎛️
 
-This document describes how to configure your Plex Media Server to integrate with NetPlex, covering **Library Integration** (using flat directory stubs) and **API Sync Integration** (Plex PIN flows & collections).
+This document describes how to configure your Plex Media Server to integrate with NetPlex, covering **Library Integration** (using separate dedicated Plex libraries) and **API Sync Integration** (Plex PIN flows & collections).
 
 ---
 
-## 📁 Library Configuration (Local Assets)
+## 📁 Library Configuration (Local Assets & Separate Libraries)
 
-NetPlex generates a flat, lean file layout. In Plex, you should map separate libraries for movies and TV shows.
+> [!IMPORTANT]
+> **Recommended Best Practice**: NetPlex should be configured in Plex using its own **dedicated, separate libraries** (e.g. `Netflix Top 10 - Movies` and `Netflix Top 10 - TV Shows`) without merging into existing main movie or TV libraries. Because NetPlex manages its own content lifecycle (automatically creating and pruning weekly entries), running it in a dedicated library ensures clean isolation.
+
+NetPlex generates a flat, lean file layout under `/data`. In Plex, map separate libraries for movies and TV shows:
 
 ### 1. Movies Library
 1. In Plex Web App, go to **Settings** > **Manage** > **Libraries** > **Add Library**.
@@ -21,6 +24,9 @@ NetPlex generates a flat, lean file layout. In Plex, you should map separate lib
 3. Name it `Netflix Top 10 - TV Shows`.
 4. Add the folder `/data/tv` (mapped from your container volume).
 5. In the **Advanced** tab, make sure the metadata agent is configured to read local NFOs.
+
+### 3. Dummy (Zero-Byte) Media Mode
+NetPlex supports creating **0-byte dummy trailer files** (`.mp4`/`.mkv`) alongside NFO metadata files. When Dummy Media Mode is enabled, Plex reads the NFO metadata and indexes the item into custom collections without requiring full video downloads.
 
 ---
 
