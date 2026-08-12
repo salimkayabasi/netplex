@@ -124,8 +124,9 @@ def test_parse_top10_data_global():
         assert 1 <= item['rank'] <= 10
         assert item['title'] != ""
 
+@patch('src.scraper.netflix_top10.fetch_local_title', return_value=None)
 @patch('src.scraper.netflix_top10.fetch_top10_tsv')
-def test_crawl_netflix_top10(mock_fetch, initialized_db):
+def test_crawl_netflix_top10(mock_fetch, mock_local_title, initialized_db):
     # Set monitored countries in the database
     set_monitored_country(initialized_db, "GLOBAL", "both")
     set_monitored_country(initialized_db, "AR", "tv")
@@ -165,8 +166,9 @@ def test_crawl_netflix_top10(mock_fetch, initialized_db):
     ar_movie_rankings = get_active_rankings(initialized_db, "AR", "Movies", "2026-08-02")
     assert len(ar_movie_rankings) == 0
 
+@patch('src.scraper.netflix_top10.fetch_local_title', return_value=None)
 @patch('src.scraper.netflix_top10.fetch_top10_tsv')
-def test_crawl_logging(mock_fetch, initialized_db, caplog):
+def test_crawl_logging(mock_fetch, mock_local_title, initialized_db, caplog):
     set_monitored_country(initialized_db, "GLOBAL", "both")
     set_monitored_country(initialized_db, "AR", "tv")
 
@@ -194,5 +196,26 @@ def test_crawl_logging(mock_fetch, initialized_db, caplog):
     assert any("fetching AR" in msg for msg in log_messages)
     assert any("Content types of AR: TV Shows" in msg for msg in log_messages)
     assert any("Summary of Crawling:" in msg for msg in log_messages)
+
+
+@patch('urllib.request.urlopen')
+def test_fetch_local_title_dynamic_locale(mock_urlopen):
+    from src.scraper.netflix_top10 import fetch_local_title
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'<html><body><h1>El Conjuro</h1></body></html>'
+    mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+    title = fetch_local_title(12345, "ES")
+    assert title == "El Conjuro"
+    
+    # Check that request URL used country code ES
+    req = mock_urlopen.call_args[0][0]
+    assert "netflix.com/es/title/12345" in req.full_url
+
+    # Check GLOBAL maps to us
+    fetch_local_title(12345, "GLOBAL")
+    req_global = mock_urlopen.call_args[0][0]
+    assert "netflix.com/us/title/12345" in req_global.full_url
 
 

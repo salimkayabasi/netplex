@@ -97,7 +97,7 @@ def fetch_local_title(netflix_id: int, country_code: str) -> str | None:
         return None
     cc = country_code.lower()
     if cc == 'global':
-        cc = 'tr'
+        cc = 'us'
     url = f"https://www.netflix.com/{cc}/title/{netflix_id}"
     req = urllib.request.Request(
         url,
