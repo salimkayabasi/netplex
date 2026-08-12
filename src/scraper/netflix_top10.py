@@ -326,7 +326,7 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
     
     # Process Global rankings
     if global_config:
-        set_crawl_progress(current_task, total_tasks, "Fetching Global Top 10 rankings")
+        set_crawl_progress(0, total_tasks, "Fetching Global Top 10 rankings")
         global_url = "https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv"
         global_path = os.path.join(cache_dir, "all-weeks-global.tsv")
         fetch_top10_tsv(global_url, global_path)
@@ -382,7 +382,6 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
                     weekly_views=item['views'],
                     cumulative_weeks_in_top_10=item['cumulative_weeks']
                 )
-        current_task += 1
                 
     # Process Country rankings
     if country_configs:
@@ -401,7 +400,8 @@ def crawl_netflix_top10(db_path: str, current_task_start: int = 1, total_tasks: 
                 country_groups.setdefault(cc, []).append(item)
                 
             for cc, items in country_groups.items():
-                set_crawl_progress(current_task, total_tasks, f"Fetching Top 10 rankings for {cc}")
+                set_crawl_progress(0, total_tasks, f"Fetching Top 10 rankings for {cc}")
+
                 if cc not in metadata_cache:
                     metadata_cache[cc] = fetch_country_top10_metadata(cc)
                 meta_map = metadata_cache[cc]

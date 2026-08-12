@@ -73,19 +73,20 @@ def test_run_full_sync_pipeline_sequence(
     
     execution_order = []
 
-    def side_effect_crawl(path):
+    def side_effect_crawl(*args, **kwargs):
         execution_order.append("crawl")
 
-    def side_effect_download(path):
+    def side_effect_download(*args, **kwargs):
         execution_order.append("download")
 
-    def side_effect_prune(path):
+    def side_effect_prune(*args, **kwargs):
         execution_order.append("prune")
         return {"orphans_found": 0, "folders_deleted": 0, "records_pruned": 0}
 
-    def side_effect_sync(path):
+    def side_effect_sync(*args, **kwargs):
         execution_order.append("sync")
         return True
+
 
     mock_crawl.side_effect = side_effect_crawl
     mock_download.side_effect = side_effect_download

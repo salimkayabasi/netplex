@@ -325,3 +325,13 @@ def test_tudum_metadata_fields(initialized_db):
     assert r['weekly_views'] == 14200000
     assert r['cumulative_weeks_in_top_10'] == 3
 
+def test_calculate_expected_total_tasks(initialized_db):
+    from src.database import set_monitored_country, calculate_expected_total_tasks
+    set_monitored_country(initialized_db, "US", "movie,tv")
+    set_monitored_country(initialized_db, "TR", "movie,tv")
+    
+    # 2 countries * 2 types (movies, tv) * 10 items = 40 contents total
+    total = calculate_expected_total_tasks(initialized_db)
+    assert total == 40
+
+

@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from src.database import _get_connection, get_setting, set_setting
+from src.database import _get_connection, get_setting, set_setting, calculate_expected_total_tasks
 from src.scraper.netflix_top10 import crawl_netflix_top10
 from src.scraper.tudum_downloader import download_pending_trailers
 from src.cleanup import run_cleanup_cycle
@@ -46,7 +46,7 @@ def sync_plex_collections(db_path: str) -> bool:
         logger.error(f"Plex collection sync failed: {e}")
         return False
 
-from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock
+from src.crawler_lock import try_acquire_crawl_lock, release_crawl_lock, set_crawl_progress
 
 def run_full_sync_pipeline(db_path: str) -> dict:
     """
@@ -64,13 +64,15 @@ def run_full_sync_pipeline(db_path: str) -> dict:
     try:
         logger.info("Starting full NetPlex sync pipeline...")
         results = {}
+        total_tasks = calculate_expected_total_tasks(db_path)
+        set_crawl_progress(0, total_tasks, "Initiating crawl pipeline...")
         
         logger.info("Step 1: Crawling Netflix Top 10 rankings...")
-        crawl_netflix_top10(db_path)
+        crawl_netflix_top10(db_path, total_tasks=total_tasks)
         results["step1"] = "completed"
         
         logger.info("Step 2: Downloading pending trailers...")
-        download_pending_trailers(db_path)
+        download_pending_trailers(db_path, total_tasks=total_tasks)
         results["step2"] = "completed"
         
         logger.info("Step 3: Pruning orphaned media...")

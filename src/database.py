@@ -434,3 +434,26 @@ def get_orphaned_media_items(db_path: str, current_week: str) -> list[dict]:
         return [dict(row) for row in cursor.fetchall()]
     finally:
         conn.close()
+
+def calculate_expected_total_tasks(db_path: str) -> int:
+    """Calculates total expected content items to crawl based on monitored countries and types (10 items per format)."""
+    conn = _get_connection(db_path)
+    try:
+        cursor = conn.execute("SELECT country_code, formats FROM monitored_countries")
+        countries = [dict(row) for row in cursor.fetchall()]
+        
+        cursor = conn.execute("SELECT COUNT(*) as count FROM media_items WHERE status = 'pending'")
+        pending_count = cursor.fetchone()['count']
+    finally:
+        conn.close()
+        
+    expected_count = 0
+    for c in countries:
+        fmt = (c.get("formats") or "movie,tv").lower()
+        if "movie" in fmt or "film" in fmt:
+            expected_count += 10
+        if "tv" in fmt:
+            expected_count += 10
+            
+    return max(expected_count, pending_count)
+

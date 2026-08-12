@@ -15,7 +15,8 @@ from src.database import (
     set_setting,
     get_monitored_countries,
     set_monitored_country,
-    remove_monitored_country
+    remove_monitored_country,
+    calculate_expected_total_tasks
 )
 from src.plex.auth import request_plex_pin, poll_plex_pin
 from src.plex.sync import run_plex_sync
@@ -46,26 +47,19 @@ def get_db_path(request: Request) -> str:
 
 def run_crawl_pipeline(db_path: str):
     try:
-        monitored = get_monitored_countries(db_path)
-        ranking_tasks_count = len(monitored)
-        
-        conn = _get_connection(db_path)
-        cursor = conn.execute("SELECT COUNT(*) as count FROM media_items WHERE status = 'pending'")
-        initial_pending = cursor.fetchone()['count']
-        conn.close()
-        
-        total_tasks = ranking_tasks_count + initial_pending
-        set_crawl_progress(1, total_tasks, "Initiating crawl pipeline...")
+        total_tasks = calculate_expected_total_tasks(db_path)
+        set_crawl_progress(0, total_tasks, "Initiating crawl pipeline...")
 
-        crawl_netflix_top10(db_path, current_task_start=1, total_tasks=total_tasks)
+        crawl_netflix_top10(db_path, total_tasks=total_tasks)
         
         conn = _get_connection(db_path)
         cursor = conn.execute("SELECT COUNT(*) as count FROM media_items WHERE status = 'pending'")
         new_pending = cursor.fetchone()['count']
         conn.close()
         
-        total_tasks = ranking_tasks_count + new_pending
-        download_pending_trailers(db_path, current_task_start=ranking_tasks_count + 1, total_tasks=total_tasks)
+        total_tasks = max(total_tasks, new_pending)
+        download_pending_trailers(db_path, total_tasks=total_tasks)
+
 
         conn = _get_connection(db_path)
         cursor = conn.execute("SELECT week FROM rankings ORDER BY id DESC LIMIT 1")

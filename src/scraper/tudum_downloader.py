@@ -325,10 +325,12 @@ def download_pending_trailers(db_path: str, media_dir: str = None, current_task_
     subtitle_languages_str = get_setting(db_path, "subtitle_languages", "en")
     subtitle_langs = [lang.strip() for lang in subtitle_languages_str.split(",") if lang.strip()]
     
+    total_count = max(len(items), total_tasks)
     for idx, item in enumerate(items):
-        current_task = current_task_start + idx
-        set_crawl_progress(current_task, total_tasks, f"Downloading trailer: {item['title']}")
+        current_task = idx + 1
+        set_crawl_progress(current_task, total_count, f"Downloading trailer: {item['title']}")
         logger.info(f"Processing trailer download for: {item['title']}")
+
 
         try:
             tudum_url = find_tudum_page(item['title'], item['type'], item['release_year'])
