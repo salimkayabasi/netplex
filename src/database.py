@@ -468,6 +468,67 @@ def get_media_item_by_netflix_id(db_path: str, netflix_id_or_id: int | str, item
     finally:
         conn.close()
 
+def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | None, dict | None]:
+    """Gets the previous and next media items of the same format/type for navigation."""
+    if not current_item:
+        return None, None
+
+    conn = _get_connection(db_path)
+    try:
+        item_type = str(current_item.get("type", "movie")).lower()
+        current_id = current_item.get("id")
+
+        # Get latest week if rankings exist
+        latest_week = ""
+        cursor = conn.execute("SELECT week FROM rankings ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            latest_week = row["week"]
+
+        if latest_week:
+            cursor = conn.execute("""
+                SELECT m.*
+                FROM media_items m
+                LEFT JOIN (
+                    SELECT media_item_id, MIN(rank) as min_rank
+                    FROM rankings
+                    WHERE week = ?
+                    GROUP BY media_item_id
+                ) r ON m.id = r.media_item_id
+                WHERE m.type = ?
+                ORDER BY 
+                    CASE WHEN r.min_rank IS NOT NULL THEN 0 ELSE 1 END,
+                    r.min_rank ASC,
+                    m.id ASC
+            """, (latest_week, item_type))
+        else:
+            cursor = conn.execute("""
+                SELECT * FROM media_items
+                WHERE type = ?
+                ORDER BY id ASC
+            """, (item_type,))
+
+        items = [dict(r) for r in cursor.fetchall()]
+        if not items or len(items) <= 1:
+            return None, None
+
+        current_index = -1
+        for idx, itm in enumerate(items):
+            if itm["id"] == current_id or (itm.get("netflix_id") and current_item.get("netflix_id") and itm.get("netflix_id") == current_item.get("netflix_id")):
+                current_index = idx
+                break
+
+        if current_index == -1:
+            return None, None
+
+        prev_index = (current_index - 1) % len(items)
+        next_index = (current_index + 1) % len(items)
+
+        return items[prev_index], items[next_index]
+    finally:
+        conn.close()
+
+
 def calculate_expected_total_tasks(db_path: str) -> int:
     """Calculates total expected content items to crawl based on monitored countries and types (10 items per format)."""
     conn = _get_connection(db_path)

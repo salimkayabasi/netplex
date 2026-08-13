@@ -64,10 +64,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Keyboard ESC listener
+    // Keyboard ESC and Arrow navigation listeners
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modalBackdrop && modalBackdrop.classList.contains('active')) {
             window.closeTrailerModal();
+            return;
+        }
+
+        // Detail Page Prev/Next keyboard navigation
+        const activeElem = document.activeElement;
+        if (activeElem && (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElem.tagName) || activeElem.isContentEditable)) {
+            return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+            const prevBtn = document.getElementById('detail-prev-link') || document.querySelector('.side-arrow-left');
+            if (prevBtn) {
+                prevBtn.click();
+            }
+        } else if (e.key === 'ArrowRight') {
+            const nextBtn = document.getElementById('detail-next-link') || document.querySelector('.side-arrow-right');
+            if (nextBtn) {
+                nextBtn.click();
+            }
         }
     });
 

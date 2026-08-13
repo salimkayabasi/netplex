@@ -12,7 +12,60 @@
         <a href="{% if media_item.type == 'tv' %}/tv{% else %}/movies{% endif %}" class="back-link">
             ← Back to {% if media_item.type == 'tv' %}TV Shows{% else %}Movies{% endif %}
         </a>
+        <div class="detail-nav-controls">
+            {% if prev_item %}
+            <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}" id="detail-prev-link" class="detail-nav-btn prev-btn" title="Previous: {{ prev_item.title }}">
+                <span class="nav-arrow-icon">‹</span>
+                <span class="nav-btn-text">Prev</span>
+            </a>
+            {% endif %}
+            {% if next_item %}
+            <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}" id="detail-next-link" class="detail-nav-btn next-btn" title="Next: {{ next_item.title }}">
+                <span class="nav-btn-text">Next</span>
+                <span class="nav-arrow-icon">›</span>
+            </a>
+            {% endif %}
+        </div>
     </div>
+
+    <!-- Floating Side Navigation Arrows -->
+    {% if prev_item %}
+    <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}" class="detail-side-arrow side-arrow-left" aria-label="Previous: {{ prev_item.title }}">
+        <div class="side-arrow-btn">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </div>
+        <div class="side-arrow-preview left-preview">
+            {% if prev_item.poster_url %}
+            <img src="{{ prev_item.poster_url }}" alt="{{ prev_item.title }}" class="side-preview-poster">
+            {% endif %}
+            <div class="side-preview-info">
+                <span class="side-preview-tag">‹ PREVIOUS</span>
+                <span class="side-preview-title">{{ prev_item.title }}</span>
+            </div>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if next_item %}
+    <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}" class="detail-side-arrow side-arrow-right" aria-label="Next: {{ next_item.title }}">
+        <div class="side-arrow-btn">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </div>
+        <div class="side-arrow-preview right-preview">
+            {% if next_item.poster_url %}
+            <img src="{{ next_item.poster_url }}" alt="{{ next_item.title }}" class="side-preview-poster">
+            {% endif %}
+            <div class="side-preview-info">
+                <span class="side-preview-tag">NEXT ›</span>
+                <span class="side-preview-title">{{ next_item.title }}</span>
+            </div>
+        </div>
+    </a>
+    {% endif %}
 
     <!-- Hero Player / Media Section -->
     <div class="detail-hero">

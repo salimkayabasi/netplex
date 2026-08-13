@@ -14,7 +14,8 @@ from src.database import (
     get_monitored_countries,
     get_active_rankings,
     get_setting,
-    get_media_item_by_netflix_id
+    get_media_item_by_netflix_id,
+    get_prev_next_media_items
 )
 
 logger = logging.getLogger(__name__)
@@ -274,6 +275,8 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
         "actors": nfo_data["actors"],
     }
 
+    prev_item, next_item = get_prev_next_media_items(db_path, media_item)
+
     return templates.TemplateResponse(
         request=request,
         name="detail.html",
@@ -281,6 +284,8 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
             "media_item": media_item,
             "details": details,
             "dummy_media_mode": dummy_media_mode,
+            "prev_item": prev_item,
+            "next_item": next_item,
         }
     )
 
