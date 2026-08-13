@@ -29,7 +29,6 @@ def release_crawl_lock():
 
 def is_crawl_in_progress() -> bool:
     """Checks whether a crawl job is currently running."""
-    global _IS_CRAWLING
     with _crawl_lock:
         return _IS_CRAWLING
 
@@ -44,7 +43,6 @@ def set_crawl_progress(current_task: int, total_tasks: int, message: str = ""):
 
 def get_crawl_status_info() -> dict:
     """Returns detailed dictionary of crawl progress status for API responses."""
-    global _IS_CRAWLING, _CURRENT_TASK, _TOTAL_TASKS, _TASK_MESSAGE
     with _crawl_lock:
         if not _IS_CRAWLING:
             return {

@@ -93,7 +93,6 @@ def get_logger(name: str = "netplex") -> logging.Logger:
     """
     Helper function to retrieve logger instance. Automatically initializes setup_logger if not yet configured.
     """
-    global _initialized
     if not _initialized and not logging.getLogger("netplex").hasHandlers():
         setup_logger()
 
