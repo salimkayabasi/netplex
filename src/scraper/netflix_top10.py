@@ -20,15 +20,34 @@ from src.logger import get_logger
 logger = get_logger("netplex.crawler")
 
 COUNTRY_SLUGS = {
-    'GLOBAL': '', 'US': 'united-states', 'GB': 'united-kingdom',
-    'CA': 'canada', 'AU': 'australia', 'DE': 'germany',
-    'FR': 'france', 'ES': 'spain', 'IT': 'italy',
-    'JP': 'japan', 'KR': 'south-korea', 'BR': 'brazil',
-    'MX': 'mexico', 'IN': 'india', 'TR': 'turkey'
+    'GLOBAL': '', 'AR': 'argentina', 'AU': 'australia', 'AT': 'austria',
+    'BS': 'bahamas', 'BH': 'bahrain', 'BD': 'bangladesh', 'BE': 'belgium',
+    'BO': 'bolivia', 'BR': 'brazil', 'BG': 'bulgaria', 'CA': 'canada',
+    'CL': 'chile', 'CO': 'colombia', 'CR': 'costa-rica', 'HR': 'croatia',
+    'CY': 'cyprus', 'CZ': 'czech-republic', 'DK': 'denmark', 'DO': 'dominican-republic',
+    'EC': 'ecuador', 'EG': 'egypt', 'SV': 'el-salvador', 'EE': 'estonia',
+    'FI': 'finland', 'FR': 'france', 'DE': 'germany', 'GR': 'greece',
+    'GP': 'guadeloupe', 'GT': 'guatemala', 'HN': 'honduras', 'HK': 'hong-kong',
+    'HU': 'hungary', 'IS': 'iceland', 'IN': 'india', 'ID': 'indonesia',
+    'IE': 'ireland', 'IL': 'israel', 'IT': 'italy', 'JM': 'jamaica',
+    'JP': 'japan', 'JO': 'jordan', 'KE': 'kenya', 'KW': 'kuwait',
+    'LV': 'latvia', 'LB': 'lebanon', 'LT': 'lithuania', 'LU': 'luxembourg',
+    'MY': 'malaysia', 'MV': 'maldives', 'MT': 'malta', 'MQ': 'martinique',
+    'MU': 'mauritius', 'MX': 'mexico', 'MA': 'morocco', 'NL': 'netherlands',
+    'NC': 'new-caledonia', 'NZ': 'new-zealand', 'NI': 'nicaragua', 'NG': 'nigeria',
+    'NO': 'norway', 'OM': 'oman', 'PK': 'pakistan', 'PA': 'panama',
+    'PY': 'paraguay', 'PE': 'peru', 'PH': 'philippines', 'PL': 'poland',
+    'PT': 'portugal', 'QA': 'qatar', 'RO': 'romania', 'RE': 'reunion',
+    'SA': 'saudi-arabia', 'RS': 'serbia', 'SG': 'singapore', 'SK': 'slovakia',
+    'SI': 'slovenia', 'ZA': 'south-africa', 'KR': 'south-korea', 'ES': 'spain',
+    'LK': 'sri-lanka', 'SE': 'sweden', 'CH': 'switzerland', 'TW': 'taiwan',
+    'TH': 'thailand', 'TT': 'trinidad-and-tobago', 'TR': 'turkey', 'UA': 'ukraine',
+    'AE': 'united-arab-emirates', 'GB': 'united-kingdom', 'US': 'united-states',
+    'UY': 'uruguay', 'VE': 'venezuela', 'VN': 'vietnam'
 }
 
 def fetch_country_top10_metadata(country_code: str) -> dict:
-    slug = COUNTRY_SLUGS.get(country_code.upper(), '')
+    slug = COUNTRY_SLUGS.get(country_code.upper(), country_code.lower())
     url = f"https://www.netflix.com/tudum/top10/{slug}".rstrip('/')
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:

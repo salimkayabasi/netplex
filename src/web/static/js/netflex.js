@@ -273,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (wasCrawling) {
                     wasCrawling = false;
                     stopPolling();
-                    updateCrawlStatusUI(false, "✓ Crawl Done!", "Status: ✓ Crawl Done!");
+                    updateCrawlStatusUI(false, "Crawl completed", "Status: Crawl completed");
                     if (document.getElementById('btn-landing-crawl')) {
                         setTimeout(() => window.location.reload(), 1000);
                     } else {
