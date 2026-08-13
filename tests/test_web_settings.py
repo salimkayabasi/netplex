@@ -25,11 +25,12 @@ def client_and_db():
         app.state.log_path = log_path
         app.state.config_dir = tmp_dir
         
-        client = TestClient(app)
-        try:
-            yield client, db_path, log_path, tmp_dir
-        finally:
-            release_crawl_lock()
+        with patch("src.web.routes_settings.run_crawl_pipeline"):
+            client = TestClient(app)
+            try:
+                yield client, db_path, log_path, tmp_dir
+            finally:
+                release_crawl_lock()
 
 
 def test_get_settings_page(client_and_db):
