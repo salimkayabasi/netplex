@@ -25,7 +25,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-app = FastAPI(title="NetPlex Web Server")
+NETPLEX_VERSION = os.environ.get("NETPLEX_VERSION", "dev")
+app = FastAPI(title="NetPlex Web Server", version=NETPLEX_VERSION)
 
 # Mount /static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

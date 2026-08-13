@@ -1,5 +1,7 @@
 FROM python:3.11-slim-bookworm
 
+ARG APP_VERSION=dev
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -27,6 +29,7 @@ ENV NETPLEX_DB_PATH=/config/netplex.db \
     NETPLEX_CONFIG_DIR=/config \
     NETPLEX_CACHE_DIR=/config/cache \
     NETPLEX_DATA_DIR=/data \
+    NETPLEX_VERSION=${APP_VERSION} \
     PYTHONUNBUFFERED=1
 
 # Native Docker Healthcheck
