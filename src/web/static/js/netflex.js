@@ -79,34 +79,61 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayLabel = taskDisplay || "Crawling...";
         
         const landingBtn = document.getElementById('btn-landing-crawl');
+        const landingLabel = document.getElementById('btn-landing-crawl-label');
+        const landingIcon = landingBtn ? landingBtn.querySelector('.crawl-icon') : null;
+
         if (landingBtn) {
-            if (isCrawling) {
-                landingBtn.disabled = true;
-                landingBtn.textContent = `⏳ ${displayLabel}`;
+            landingBtn.disabled = isCrawling;
+            if (landingLabel) {
+                landingLabel.textContent = isCrawling ? displayLabel : (taskDisplay || "Sync & Crawl");
             } else {
-                landingBtn.disabled = false;
-                landingBtn.textContent = taskDisplay || "▶ Trigger Crawl";
+                landingBtn.textContent = isCrawling ? displayLabel : (taskDisplay || "Sync & Crawl");
+            }
+            if (landingIcon) {
+                if (isCrawling) {
+                    landingIcon.classList.add('spinning');
+                } else {
+                    landingIcon.classList.remove('spinning');
+                }
             }
         }
 
         const settingsBtn = document.getElementById('btn-trigger-crawl');
-        const settingsBadge = document.getElementById('crawl-status-badge');
+        const settingsLabel = document.getElementById('btn-trigger-crawl-label');
+        const settingsIcon = settingsBtn ? settingsBtn.querySelector('.crawl-icon') : null;
+
         if (settingsBtn) {
-            if (isCrawling) {
-                settingsBtn.disabled = true;
-                settingsBtn.textContent = `▶ ${displayLabel}`;
+            settingsBtn.disabled = isCrawling;
+            if (settingsLabel) {
+                settingsLabel.textContent = isCrawling ? displayLabel : "Trigger Manual Crawl Job";
             } else {
-                settingsBtn.disabled = false;
-                settingsBtn.textContent = "▶ Trigger Manual Crawl Job";
+                settingsBtn.textContent = isCrawling ? displayLabel : "Trigger Manual Crawl Job";
+            }
+            if (settingsIcon) {
+                if (isCrawling) {
+                    settingsIcon.classList.add('spinning');
+                } else {
+                    settingsIcon.classList.remove('spinning');
+                }
             }
         }
-        if (settingsBadge) {
+
+        const settingsDot = document.getElementById('crawl-status-dot');
+        const settingsStatusText = document.getElementById('crawl-status-text');
+        const settingsBadge = document.getElementById('crawl-status-badge');
+
+        if (settingsStatusText) {
+            settingsStatusText.textContent = statusMessage || (isCrawling ? `Status: ${displayLabel}` : "Status: Idle");
+        } else if (settingsBadge) {
+            settingsBadge.textContent = statusMessage || (isCrawling ? `Status: ${displayLabel}` : "Status: Idle");
+        }
+
+        if (settingsDot) {
+            settingsDot.classList.remove('active-running', 'active-success');
             if (isCrawling) {
-                settingsBadge.textContent = `Status: ${statusMessage || displayLabel}`;
-                settingsBadge.style.color = "#f1c40f";
-            } else {
-                settingsBadge.textContent = statusMessage || "Status: Idle";
-                settingsBadge.style.color = "var(--text-secondary)";
+                settingsDot.classList.add('active-running');
+            } else if (statusMessage && statusMessage.includes('Done')) {
+                settingsDot.classList.add('active-success');
             }
         }
     }
@@ -119,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.is_crawling) {
                 wasCrawling = true;
-                updateCrawlStatusUI(true, data.task_display, data.message);
+                updateCrawlStatusUI(true, data.task_display, `Status: ${data.message || data.task_display}`);
                 startPolling();
             } else {
                 if (wasCrawling) {
@@ -157,30 +184,36 @@ document.addEventListener('DOMContentLoaded', () => {
     window.triggerManualCrawl = async () => {
         const landingBtn = document.getElementById('btn-landing-crawl');
         const settingsBtn = document.getElementById('btn-trigger-crawl');
-        const settingsBadge = document.getElementById('crawl-status-badge');
+        const settingsDot = document.getElementById('crawl-status-dot');
+        const settingsStatusText = document.getElementById('crawl-status-text');
 
         if (landingBtn) landingBtn.disabled = true;
         if (settingsBtn) settingsBtn.disabled = true;
-        if (settingsBadge) {
-            settingsBadge.textContent = "Status: Initiating pipeline...";
-            settingsBadge.style.color = "#f1c40f";
+        
+        if (settingsDot) {
+            settingsDot.classList.remove('active-success');
+            settingsDot.classList.add('active-running');
+        }
+        if (settingsStatusText) {
+            settingsStatusText.textContent = "Status: Initiating pipeline...";
         }
 
         try {
             const resp = await fetch('/api/crawl', { method: 'POST' });
             if (resp.status === 202) {
                 wasCrawling = true;
-                updateCrawlStatusUI(true, "Status: Crawl job in progress in background...");
+                updateCrawlStatusUI(true, "Initiating...", "Status: Crawl job in progress...");
                 startPolling();
             } else if (resp.status === 409) {
                 wasCrawling = true;
-                updateCrawlStatusUI(true, "Status: A crawl job is already running!");
+                updateCrawlStatusUI(true, "Crawling...", "Status: A crawl job is already running!");
                 startPolling();
             } else {
                 throw new Error(`Unexpected status code ${resp.status}`);
             }
         } catch (err) {
-            updateCrawlStatusUI(false, `Status: Error - ${err.message}`);
+            if (settingsDot) settingsDot.classList.remove('active-running');
+            updateCrawlStatusUI(false, null, `Status: Error - ${err.message}`);
             setTimeout(() => updateCrawlStatusUI(false), 3000);
         }
     };

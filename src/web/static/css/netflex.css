@@ -559,15 +559,39 @@ body {
     border-radius: 4px;
 }
 
-/* Navigation Bar Custom Action Buttons */
 .tab-btn-crawl {
     cursor: pointer;
-    background: rgba(39, 174, 96, 0.2);
-    border: 1px solid #27ae60;
-    color: #2ecc71;
-    display: flex;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+    display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
+    padding: 0.45rem 1rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn-crawl:hover:not(:disabled) {
+    background: rgba(229, 9, 20, 0.2);
+    border-color: var(--netflix-red);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(229, 9, 20, 0.35);
+    transform: translateY(-1px);
+}
+
+.tab-btn-crawl:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.tab-btn-crawl:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: rgba(229, 9, 20, 0.15);
+    border-color: rgba(229, 9, 20, 0.4);
+    color: var(--text-primary);
 }
 
 .tab-btn-link {
@@ -725,26 +749,120 @@ body {
     cursor: pointer;
 }
 
-.status-badge {
-    margin-bottom: 1rem;
+.control-panel-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.crawl-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.85rem;
-    padding: 0.5rem 0.8rem;
+    font-weight: 500;
+    padding: 0.45rem 0.9rem;
     border-radius: 4px;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--text-secondary);
+    transition: all 0.25s ease;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #666;
+    display: inline-block;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.status-dot.active-running {
+    background-color: var(--netflix-red);
+    box-shadow: 0 0 8px rgba(229, 9, 20, 0.8);
+    animation: pulse-dot 1.5s infinite;
+}
+
+.status-dot.active-success {
+    background-color: #2ecc71;
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.8);
 }
 
 .btn-trigger-crawl {
     width: 100%;
-    background-color: #27ae60;
-    color: #fff;
+    min-width: 220px;
+    background-color: var(--netflix-red);
+    color: #ffffff;
     border: none;
-    padding: 0.8rem 1.2rem;
+    padding: 0.75rem 1.4rem;
     border-radius: 4px;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.3px;
     cursor: pointer;
-    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    box-shadow: 0 4px 14px rgba(229, 9, 20, 0.35);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-trigger-crawl:hover:not(:disabled) {
+    background-color: #b80710;
+    box-shadow: 0 6px 18px rgba(229, 9, 20, 0.5);
+    transform: translateY(-1px);
+}
+
+.btn-trigger-crawl:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-trigger-crawl:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background-color: rgba(229, 9, 20, 0.6);
+    box-shadow: none;
+}
+
+.btn-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.crawl-icon {
+    transition: transform 0.3s ease;
+}
+
+.crawl-icon.spinning {
+    animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse-dot {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.7);
+    }
+    70% {
+        transform: scale(1.15);
+        box-shadow: 0 0 0 8px rgba(229, 9, 20, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(229, 9, 20, 0);
+    }
 }
 
 .settings-section-card {
