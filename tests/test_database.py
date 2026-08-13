@@ -39,7 +39,7 @@ def test_init_db_creates_tables_and_seeds(initialized_db):
         assert "rankings" in tables
 
         # Verify seeded settings
-        assert get_setting(initialized_db, "cron_expression") == "0 0 * * 2"
+        assert get_setting(initialized_db, "cron_expression") == "0 2 * * *"
         assert get_setting(initialized_db, "log_level") == "INFO"
         assert get_setting(initialized_db, "trailer_subtitles") == "false"
         assert get_setting(initialized_db, "subtitle_languages") == "en"

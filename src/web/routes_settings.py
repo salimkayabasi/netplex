@@ -103,7 +103,7 @@ def get_settings_page(request: Request):
     
     plex_url = get_setting(db_path, "plex_url", "http://localhost:32400")
     plex_token = get_setting(db_path, "plex_token", "")
-    cron_expression = get_setting(db_path, "cron_expression", "0 0 * * 2")
+    cron_expression = get_setting(db_path, "cron_expression", "0 2 * * *")
     dummy_media_mode = get_setting(db_path, "dummy_media_mode", "false").lower() in ("true", "1", "yes", "on")
     trailer_subtitles = get_setting(db_path, "trailer_subtitles", "false").lower() in ("true", "1", "yes", "on")
     subtitle_languages = get_setting(db_path, "subtitle_languages", "en")

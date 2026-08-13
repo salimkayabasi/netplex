@@ -19,12 +19,18 @@ COPY . .
 EXPOSE 8000
 
 # Create volume directories
+RUN mkdir -p /config /data /config/cache
 VOLUME ["/config", "/data"]
 
 # Define environment variables with defaults
 ENV NETPLEX_DB_PATH=/config/netplex.db \
     NETPLEX_CONFIG_DIR=/config \
     NETPLEX_CACHE_DIR=/config/cache \
+    NETPLEX_DATA_DIR=/data \
     PYTHONUNBUFFERED=1
+
+# Native Docker Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
 
 CMD ["python", "main.py"]

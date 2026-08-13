@@ -112,7 +112,7 @@ erDiagram
 Stores general global settings editable via the Web UI:
 * `plex_url`: The address of the Plex Media Server.
 * `plex_token`: The authenticated Plex API token.
-* `cron_expression`: Standard 5-field Cron expression for scraper runs (defaults to `0 0 * * 2` for weekly Tuesday runs).
+* `cron_expression`: Standard 5-field Cron expression for scraper runs (defaults to `0 2 * * *` for daily 2 AM runs).
 * `log_level`: Level of detail in execution logs.
 * `dummy_media_mode`: Flag (`true`/`false`) to generate zero-byte `.mp4` dummy files instead of downloading full video streams.
 

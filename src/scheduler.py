@@ -103,10 +103,10 @@ def should_run_sync(db_path: str) -> bool:
         if last_dt.tzinfo is None:
             last_dt = last_dt.replace(tzinfo=timezone.utc)
             
-        cron_expr = get_setting(db_path, "cron_expression", "0 0 * * 2")
+        cron_expr = get_setting(db_path, "cron_expression", "0 2 * * *")
         if not croniter.is_valid(cron_expr):
-            logger.warning(f"Invalid cron_expression '{cron_expr}', falling back to default '0 0 * * 2'")
-            cron_expr = "0 0 * * 2"
+            logger.warning(f"Invalid cron_expression '{cron_expr}', falling back to default '0 2 * * *'")
+            cron_expr = "0 2 * * *"
 
         now = datetime.now(timezone.utc)
         cron_iter = croniter(cron_expr, last_dt)

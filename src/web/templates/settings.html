@@ -147,14 +147,19 @@
                 <label for="cron_expression" class="form-label">
                     Cron Schedule Expression (5-field)
                 </label>
-                <input type="text" id="cron_expression" name="cron_expression" value="{{ cron_expression }}" placeholder="0 0 * * 2" required class="form-control">
+                <input type="text" id="cron_expression" name="cron_expression" value="{{ cron_expression }}" placeholder="0 2 * * *" required class="form-control">
                 
                 <div class="setting-help-box">
                     <div class="help-box-title">Cron Background Job</div>
-                    <p class="help-box-desc">Automates background scans, downloads, and server synchronization on a scheduled interval.</p>
+                    <p class="help-box-desc">
+                        Automates background scans, downloads, and server synchronization on a scheduled interval.
+                        <a id="crontab-guru-link" href="https://crontab.guru/#{{ cron_expression|replace(' ', '_') }}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-red); text-decoration: underline; margin-left: 6px; font-weight: 500;">
+                            View schedule on crontab.guru ↗
+                        </a>
+                    </p>
                     <ul class="help-box-list">
                         <li><strong>What happens when triggered:</strong> NetPlex automatically fetches the newest weekly Netflix Top 10 data, queries YouTube for trailer videos, downloads subtitle files, updates Plex collections, and cleans up expired media items.</li>
-                        <li><strong>Default Schedule:</strong> <code>0 0 * * 2</code> (Runs every Tuesday at midnight UTC, matching Netflix's weekly Top 10 dataset updates).</li>
+                        <li><strong>Default Schedule:</strong> <code>0 2 * * *</code> (Runs daily at 2:00 AM UTC).</li>
                     </ul>
                 </div>
             </div>
@@ -462,16 +467,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const triggerPrefsSave = () => {
         autoSaveSettings({
-            cron_expression: cronExprEl ? cronExprEl.value : "0 0 * * 2",
+            cron_expression: cronExprEl ? cronExprEl.value : "0 2 * * *",
             dummy_media_mode: dummyModeEl ? dummyModeEl.checked : false,
             subtitle_languages: subLangEl ? subLangEl.value : "en",
             trailer_subtitles: trailerSubEl ? trailerSubEl.checked : false
         });
     };
 
+    const updateCrontabLink = () => {
+        const cronLink = document.getElementById('crontab-guru-link');
+        if (cronExprEl && cronLink) {
+            const val = cronExprEl.value.trim().replace(/\s+/g, '_');
+            cronLink.href = `https://crontab.guru/#${val}`;
+        }
+    };
+
     if (cronExprEl) {
-        cronExprEl.addEventListener('input', savePrefsDebounced);
-        cronExprEl.addEventListener('change', triggerPrefsSave);
+        cronExprEl.addEventListener('input', () => {
+            updateCrontabLink();
+            savePrefsDebounced();
+        });
+        cronExprEl.addEventListener('change', () => {
+            updateCrontabLink();
+            triggerPrefsSave();
+        });
+        updateCrontabLink();
     }
     if (dummyModeEl) {
         dummyModeEl.addEventListener('change', triggerPrefsSave);

@@ -43,7 +43,7 @@ Rather than scanning all 90+ countries tracked by Netflix, NetPlex only parses t
   * Selecting both functions identically to a `Both` sync.
 
 ### 3. Sync & Download Options
-* **Cron Schedule**: Standard 5-field cron expression for scheduling scraper runs (defaults to `0 0 * * 2` / weekly on Tuesdays at midnight, since Netflix publishes new Top 10 data weekly on Tuesdays).
+* **Cron Schedule**: Standard 5-field cron expression for scheduling scraper runs (defaults to `0 2 * * *` / daily at 2:00 AM).
 * **Trailer Downloader Engine**: Uses `yt-dlp` to fetch trailer videos and subtitle tracks.
 * **Dummy (Zero-Byte) Media Mode**: Toggle to generate fake 0-byte `.mp4`/`.mkv` files instead of downloading full video streams, allowing Plex to index items and build collections without using disk storage or bandwidth.
 * **Trailer Subtitles**: Toggle to enable/disable downloading SRT subtitles for trailers.
@@ -66,7 +66,7 @@ SELECT * FROM settings;
 | :--- | :--- |
 | `plex_url` | `http://192.168.1.50:32400` |
 | `plex_token` | `xYz123456789abcDEF` |
-| `cron_expression` | `0 0 * * 2` |
+| `cron_expression` | `0 2 * * *` |
 | `log_level` | `INFO` |
 | `dummy_media_mode` | `false` |
 

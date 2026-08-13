@@ -113,7 +113,7 @@ def init_db(db_path: str = "/config/netplex.db"):
             
             # Seed default configurations
             defaults = [
-                ('cron_expression', '0 0 * * 2'),
+                ('cron_expression', '0 2 * * *'),
                 ('dummy_media_mode', 'false'),
                 ('log_level', 'INFO'),
                 ('trailer_subtitles', 'false'),
