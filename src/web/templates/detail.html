@@ -19,6 +19,14 @@
                 <span class="nav-btn-text">Prev</span>
             </a>
             {% endif %}
+            
+            {% if item_position and total_items %}
+            <div class="detail-position-badge" title="Position {{ item_position }} of {{ total_items }}">
+                <span class="pos-num">#{% if item_position < 10 %}0{{ item_position }}{% else %}{{ item_position }}{% endif %}</span>
+                <span class="pos-total">/ {{ total_items }}</span>
+            </div>
+            {% endif %}
+
             {% if next_item %}
             <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}" id="detail-next-link" class="detail-nav-btn next-btn" title="Next: {{ next_item.title }}">
                 <span class="nav-btn-text">Next</span>
@@ -129,6 +137,9 @@
             </div>
 
             <div class="detail-meta-badges">
+                {% if item_position %}
+                <span class="badge-rank-pill">TOP #{% if item_position < 10 %}0{{ item_position }}{% else %}{{ item_position }}{% endif %}</span>
+                {% endif %}
                 <span class="badge-type">{{ media_item.type | upper }}</span>
                 <span class="meta-item">{{ media_item.release_year }}</span>
                 {% if media_item.season_name %}

@@ -306,10 +306,11 @@ def test_detail_page_prev_next_navigation(test_env):
     insert_ranking(db_path, "US", "Movies", 2, "2026-08-01", item2)
     insert_ranking(db_path, "US", "Movies", 3, "2026-08-01", item3)
 
-    # View Movie Two (Rank 2) -> Prev should be Movie One, Next should be Movie Three
+    # View Movie Two (Rank 2) -> Position #02 / 3. Prev is Movie One, Next is Movie Three
     resp = client.get("/movie/102")
     assert resp.status_code == 200
     assert "Movie Two" in resp.text
+    assert '#02' in resp.text
     assert 'id="detail-prev-link"' in resp.text
     assert 'id="detail-next-link"' in resp.text
     assert '/movie/101' in resp.text
@@ -317,11 +318,23 @@ def test_detail_page_prev_next_navigation(test_env):
     assert 'side-arrow-left' in resp.text
     assert 'side-arrow-right' in resp.text
 
-    # View Movie One (Rank 1) -> Wrap around: Prev should be Movie Three (Rank 3), Next should be Movie Two (Rank 2)
+    # View Movie One (Rank 1) -> Position #01 / 3. Prev button should be HIDDEN, Next is Movie Two
     resp_first = client.get("/movie/101")
     assert resp_first.status_code == 200
-    assert '/movie/103' in resp_first.text
+    assert '#01' in resp_first.text
+    assert 'id="detail-prev-link"' not in resp_first.text
+    assert 'side-arrow-left' not in resp_first.text
+    assert 'id="detail-next-link"' in resp_first.text
     assert '/movie/102' in resp_first.text
+
+    # View Movie Three (Rank 3 - last item) -> Position #03 / 3. Next button should be HIDDEN, Prev is Movie Two
+    resp_last = client.get("/movie/103")
+    assert resp_last.status_code == 200
+    assert '#03' in resp_last.text
+    assert 'id="detail-next-link"' not in resp_last.text
+    assert 'side-arrow-right' not in resp_last.text
+    assert 'id="detail-prev-link"' in resp_last.text
+    assert '/movie/102' in resp_last.text
 
 
 

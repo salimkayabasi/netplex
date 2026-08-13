@@ -468,10 +468,10 @@ def get_media_item_by_netflix_id(db_path: str, netflix_id_or_id: int | str, item
     finally:
         conn.close()
 
-def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | None, dict | None]:
-    """Gets the previous and next media items of the same format/type for navigation."""
+def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | None, dict | None, int | None, int]:
+    """Gets previous & next media items (without wrap-around), position index, and total item count."""
     if not current_item:
-        return None, None
+        return None, None, None, 0
 
     conn = _get_connection(db_path)
     try:
@@ -509,8 +509,10 @@ def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | 
             """, (item_type,))
 
         items = [dict(r) for r in cursor.fetchall()]
-        if not items or len(items) <= 1:
-            return None, None
+        if not items:
+            return None, None, None, 0
+
+        total_items = len(items)
 
         current_index = -1
         for idx, itm in enumerate(items):
@@ -519,12 +521,15 @@ def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | 
                 break
 
         if current_index == -1:
-            return None, None
+            return None, None, None, total_items
 
-        prev_index = (current_index - 1) % len(items)
-        next_index = (current_index + 1) % len(items)
+        position = current_index + 1
 
-        return items[prev_index], items[next_index]
+        # No wrap-around: hide prev at position 1, hide next at position total_items
+        prev_item = items[current_index - 1] if current_index > 0 else None
+        next_item = items[current_index + 1] if current_index < total_items - 1 else None
+
+        return prev_item, next_item, position, total_items
     finally:
         conn.close()
 

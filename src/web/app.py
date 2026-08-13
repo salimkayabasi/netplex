@@ -275,7 +275,7 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
         "actors": nfo_data["actors"],
     }
 
-    prev_item, next_item = get_prev_next_media_items(db_path, media_item)
+    prev_item, next_item, item_position, total_items = get_prev_next_media_items(db_path, media_item)
 
     return templates.TemplateResponse(
         request=request,
@@ -286,6 +286,8 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
             "dummy_media_mode": dummy_media_mode,
             "prev_item": prev_item,
             "next_item": next_item,
+            "item_position": item_position,
+            "total_items": total_items,
         }
     )
 

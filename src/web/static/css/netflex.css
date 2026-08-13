@@ -1066,6 +1066,43 @@ body {
     line-height: 1;
 }
 
+.detail-position-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem 0.75rem;
+    background: rgba(229, 9, 20, 0.15);
+    border: 1px solid rgba(229, 9, 20, 0.4);
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
+    user-select: none;
+}
+
+.detail-position-badge .pos-num {
+    color: var(--netflix-red, #e50914);
+    font-weight: 800;
+}
+
+.detail-position-badge .pos-total {
+    color: var(--text-secondary, #808080);
+    font-size: 0.78rem;
+}
+
+.badge-rank-pill {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    background: linear-gradient(135deg, #e50914 0%, #b20710 100%);
+    color: #fff;
+    font-weight: 900;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(229, 9, 20, 0.5);
+    text-transform: uppercase;
+}
+
 /* Floating Side Navigation Arrows */
 .detail-side-arrow {
     position: fixed;
