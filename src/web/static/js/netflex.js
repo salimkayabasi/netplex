@@ -1,11 +1,90 @@
 // NetPlex Tudum Client Interaction Script
 
+// Storage Keys for Video Playback & Mute Preferences
+const STORAGE_KEY_AUTOPLAY = 'netplex_video_autoplay';
+const STORAGE_KEY_MUTED = 'netplex_video_muted';
+
+let isPageNavigating = false;
+window.addEventListener('beforeunload', () => {
+    isPageNavigating = true;
+});
+
+function getSavedAutoplay() {
+    const saved = localStorage.getItem(STORAGE_KEY_AUTOPLAY);
+    return saved === null ? true : saved === 'true';
+}
+
+function setSavedAutoplay(val) {
+    localStorage.setItem(STORAGE_KEY_AUTOPLAY, val ? 'true' : 'false');
+}
+
+function getSavedMuted() {
+    const saved = localStorage.getItem(STORAGE_KEY_MUTED);
+    return saved === 'true';
+}
+
+function setSavedMuted(val) {
+    localStorage.setItem(STORAGE_KEY_MUTED, val ? 'true' : 'false');
+}
+
+function bindVideoPrefEvents(video, isModalPlayer = false) {
+    if (!video || video.dataset.prefEventsBound === 'true') return;
+    video.dataset.prefEventsBound = 'true';
+
+    // Set initial mute state from local storage
+    video.muted = getSavedMuted();
+
+    // When user plays video, save autoplay = true preference
+    video.addEventListener('play', () => {
+        setSavedAutoplay(true);
+    });
+
+    // When user pauses video, save autoplay = false preference
+    video.addEventListener('pause', () => {
+        if (isPageNavigating) return;
+        if (video.ended) return;
+        if (isModalPlayer) {
+            const modalBackdrop = document.getElementById('trailer-modal');
+            if (!modalBackdrop || !modalBackdrop.classList.contains('active') || !video.src || video.src === window.location.href) {
+                return;
+            }
+        }
+        setSavedAutoplay(false);
+    });
+
+    // When user changes volume/mute state, update saved muted preference
+    video.addEventListener('volumechange', () => {
+        setSavedMuted(video.muted);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const modalBackdrop = document.getElementById('trailer-modal');
     const modalTitle = document.getElementById('modal-media-title');
     const videoPlayer = document.getElementById('modal-video-player');
     const closeBtn = document.getElementById('modal-close-btn');
     const ytBtn = document.getElementById('modal-yt-btn');
+
+    // Bind preference tracking for modal player
+    if (videoPlayer) {
+        bindVideoPrefEvents(videoPlayer, true);
+    }
+
+    // Bind preference tracking and initial playback state for detail page video player
+    const detailVideoPlayer = document.getElementById('detail-video-player');
+    if (detailVideoPlayer) {
+        bindVideoPrefEvents(detailVideoPlayer, false);
+
+        detailVideoPlayer.muted = getSavedMuted();
+
+        if (getSavedAutoplay()) {
+            detailVideoPlayer.play().catch(err => {
+                console.log('Autoplay prevented or video unavailable:', err);
+            });
+        } else {
+            detailVideoPlayer.pause();
+        }
+    }
 
     // Open video trailer modal
     window.openTrailerModal = (itemId, title, youtubeUrl) => {
@@ -31,21 +110,26 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Set video source
         videoPlayer.src = `/stream/video/${itemId}`;
+        videoPlayer.muted = getSavedMuted();
         modalBackdrop.classList.add('active');
         
-        // Autoplay if possible
-        videoPlayer.play().catch(err => {
-            console.log('Autoplay prevented or video unavailable:', err);
-        });
+        // Autoplay if saved preference allows
+        if (getSavedAutoplay()) {
+            videoPlayer.play().catch(err => {
+                console.log('Autoplay prevented or video unavailable:', err);
+            });
+        } else {
+            videoPlayer.pause();
+        }
     };
 
     // Close video trailer modal
     window.closeTrailerModal = () => {
         if (!modalBackdrop || !videoPlayer) return;
         
+        modalBackdrop.classList.remove('active');
         videoPlayer.pause();
         videoPlayer.src = '';
-        modalBackdrop.classList.remove('active');
         if (ytBtn) {
             ytBtn.href = '#';
             ytBtn.style.display = 'none';

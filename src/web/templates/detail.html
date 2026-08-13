@@ -82,7 +82,7 @@
     <div class="detail-hero">
         {% if media_item.status == 'downloaded' and not dummy_media_mode %}
             <div class="detail-video-wrapper">
-                <video id="detail-video-player" class="detail-video-player" controls autoplay preload="metadata" {% if media_item.poster_url %}poster="{{ media_item.poster_url }}"{% endif %}>
+                <video id="detail-video-player" class="detail-video-player" controls preload="metadata" {% if media_item.poster_url %}poster="{{ media_item.poster_url }}"{% endif %}>
                     <source src="/stream/video/{{ media_item.id }}" type="video/mp4">
                     Your browser does not support HTML5 video streaming.
                 </video>
