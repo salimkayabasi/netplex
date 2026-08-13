@@ -150,9 +150,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard ESC and Arrow navigation listeners
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalBackdrop && modalBackdrop.classList.contains('active')) {
-            window.closeTrailerModal();
-            return;
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            if (modalBackdrop && modalBackdrop.classList.contains('active')) {
+                window.closeTrailerModal();
+                return;
+            }
+
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+                return;
+            }
+
+            const activeElem = document.activeElement;
+            if (activeElem && (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElem.tagName) || activeElem.isContentEditable)) {
+                activeElem.blur();
+                return;
+            }
+
+            const backLink = document.querySelector('.back-link');
+            if (backLink) {
+                backLink.click();
+                return;
+            }
         }
 
         // Detail Page Prev/Next keyboard navigation
