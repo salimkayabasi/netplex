@@ -37,7 +37,7 @@
         {% if section.rankings %}
         <div class="ranking-grid">
             {% for item in section.rankings %}
-            <a href="/{% if item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ item.netflix_id if item.netflix_id else item.media_item_id }}"
+            <a href="/{% if item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ item.netflix_id if item.netflix_id else item.media_item_id }}?country={{ section.country_code }}"
                class="media-card{% if dummy_media_mode %} dummy-mode{% endif %}"
                data-media-id="{{ item.media_item_id }}"
                data-title="{{ item.title | escape }}"

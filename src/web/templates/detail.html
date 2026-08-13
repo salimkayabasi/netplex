@@ -14,21 +14,24 @@
         </a>
         <div class="detail-nav-controls">
             {% if prev_item %}
-            <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}" id="detail-prev-link" class="detail-nav-btn prev-btn" title="Previous: {{ prev_item.title }}">
+            <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}{% if prev_item.country_code %}?country={{ prev_item.country_code }}{% endif %}" id="detail-prev-link" class="detail-nav-btn prev-btn" title="Previous: {{ prev_item.title }}">
                 <span class="nav-arrow-icon">‹</span>
                 <span class="nav-btn-text">Prev</span>
             </a>
             {% endif %}
             
-            {% if item_position and total_items %}
-            <div class="detail-position-badge" title="Position {{ item_position }} of {{ total_items }}">
-                <span class="pos-num">#{% if item_position < 10 %}0{{ item_position }}{% else %}{{ item_position }}{% endif %}</span>
-                <span class="pos-total">/ {{ total_items }}</span>
+            {% if item_rank %}
+            <div class="detail-position-badge" title="{% if item_country_name %}{{ item_country_name }} {% endif %}Rank {{ item_rank }} of 10">
+                {% if item_country_code %}
+                <span class="pos-country">{{ item_country_code }}</span>
+                {% endif %}
+                <span class="pos-num">#{% if item_rank < 10 %}0{{ item_rank }}{% else %}{{ item_rank }}{% endif %}</span>
+                <span class="pos-total">/ 10</span>
             </div>
             {% endif %}
 
             {% if next_item %}
-            <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}" id="detail-next-link" class="detail-nav-btn next-btn" title="Next: {{ next_item.title }}">
+            <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}{% if next_item.country_code %}?country={{ next_item.country_code }}{% endif %}" id="detail-next-link" class="detail-nav-btn next-btn" title="Next: {{ next_item.title }}">
                 <span class="nav-btn-text">Next</span>
                 <span class="nav-arrow-icon">›</span>
             </a>
@@ -38,7 +41,7 @@
 
     <!-- Floating Side Navigation Arrows -->
     {% if prev_item %}
-    <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}" class="detail-side-arrow side-arrow-left" aria-label="Previous: {{ prev_item.title }}">
+    <a href="/{% if prev_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ prev_item.netflix_id if prev_item.netflix_id else prev_item.id }}{% if prev_item.country_code %}?country={{ prev_item.country_code }}{% endif %}" class="detail-side-arrow side-arrow-left" aria-label="Previous: {{ prev_item.title }}">
         <div class="side-arrow-btn">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"></polyline>
@@ -49,7 +52,7 @@
             <img src="{{ prev_item.poster_url }}" alt="{{ prev_item.title }}" class="side-preview-poster">
             {% endif %}
             <div class="side-preview-info">
-                <span class="side-preview-tag">‹ PREVIOUS</span>
+                <span class="side-preview-tag">‹ PREVIOUS{% if prev_item.country_code %} ({{ prev_item.country_code }}){% endif %}</span>
                 <span class="side-preview-title">{{ prev_item.title }}</span>
             </div>
         </div>
@@ -57,7 +60,7 @@
     {% endif %}
 
     {% if next_item %}
-    <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}" class="detail-side-arrow side-arrow-right" aria-label="Next: {{ next_item.title }}">
+    <a href="/{% if next_item.type == 'tv' %}tv{% else %}movie{% endif %}/{{ next_item.netflix_id if next_item.netflix_id else next_item.id }}{% if next_item.country_code %}?country={{ next_item.country_code }}{% endif %}" class="detail-side-arrow side-arrow-right" aria-label="Next: {{ next_item.title }}">
         <div class="side-arrow-btn">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -68,7 +71,7 @@
             <img src="{{ next_item.poster_url }}" alt="{{ next_item.title }}" class="side-preview-poster">
             {% endif %}
             <div class="side-preview-info">
-                <span class="side-preview-tag">NEXT ›</span>
+                <span class="side-preview-tag">NEXT ›{% if next_item.country_code %} ({{ next_item.country_code }}){% endif %}</span>
                 <span class="side-preview-title">{{ next_item.title }}</span>
             </div>
         </div>
@@ -137,8 +140,8 @@
             </div>
 
             <div class="detail-meta-badges">
-                {% if item_position %}
-                <span class="badge-rank-pill">TOP #{% if item_position < 10 %}0{{ item_position }}{% else %}{{ item_position }}{% endif %}</span>
+                {% if item_rank %}
+                <span class="badge-rank-pill">{% if item_country_code %}{{ item_country_code }} {% endif %}TOP #{% if item_rank < 10 %}0{{ item_rank }}{% else %}{{ item_rank }}{% endif %}</span>
                 {% endif %}
                 <span class="badge-type">{{ media_item.type | upper }}</span>
                 <span class="meta-item">{{ media_item.release_year }}</span>

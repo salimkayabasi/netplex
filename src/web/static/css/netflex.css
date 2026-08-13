@@ -1080,6 +1080,17 @@ body {
     user-select: none;
 }
 
+.detail-position-badge .pos-country {
+    color: var(--text-primary, #fff);
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    margin-right: 0.2rem;
+    letter-spacing: 0.04em;
+}
+
 .detail-position-badge .pos-num {
     color: var(--netflix-red, #e50914);
     font-weight: 800;

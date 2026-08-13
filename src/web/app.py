@@ -232,7 +232,7 @@ def movies_page(request: Request):
 def tv_page(request: Request):
     return render_landing_page(request, "TV")
 
-def render_detail_page(request: Request, netflix_id: str, item_type: str):
+def render_detail_page(request: Request, netflix_id: str, item_type: str, country: Optional[str] = None):
     db_path = get_db_path(request)
     media_item = get_media_item_by_netflix_id(db_path, netflix_id, item_type)
     if not media_item:
@@ -275,7 +275,9 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
         "actors": nfo_data["actors"],
     }
 
-    prev_item, next_item, item_position, total_items = get_prev_next_media_items(db_path, media_item)
+    prev_item, next_item, item_rank, item_country_code, item_country_name = get_prev_next_media_items(
+        db_path, media_item, target_country=country
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -286,18 +288,19 @@ def render_detail_page(request: Request, netflix_id: str, item_type: str):
             "dummy_media_mode": dummy_media_mode,
             "prev_item": prev_item,
             "next_item": next_item,
-            "item_position": item_position,
-            "total_items": total_items,
+            "item_rank": item_rank,
+            "item_country_code": item_country_code,
+            "item_country_name": item_country_name,
         }
     )
 
 @app.get("/movie/{netflix_id}", response_class=HTMLResponse)
-def movie_detail_page(request: Request, netflix_id: str):
-    return render_detail_page(request, netflix_id, "movie")
+def movie_detail_page(request: Request, netflix_id: str, country: Optional[str] = Query(None)):
+    return render_detail_page(request, netflix_id, "movie", country)
 
 @app.get("/tv/{netflix_id}", response_class=HTMLResponse)
-def tv_detail_page(request: Request, netflix_id: str):
-    return render_detail_page(request, netflix_id, "tv")
+def tv_detail_page(request: Request, netflix_id: str, country: Optional[str] = Query(None)):
+    return render_detail_page(request, netflix_id, "tv", country)
 
 @app.get("/stream/video/{item_id}")
 def stream_video(

@@ -188,7 +188,7 @@ def test_dummy_media_mode_ui_and_stream(test_env, monkeypatch):
     resp_normal = client.get("/movies")
     assert resp_normal.status_code == 200
     assert "window.DUMMY_MEDIA_MODE = false;" in resp_normal.text
-    assert f'href="/movie/{item_id}"' in resp_normal.text
+    assert f'href="/movie/{item_id}?country=US"' in resp_normal.text
     assert 'class="play-overlay"' in resp_normal.text
 
     # 2. When dummy_media_mode is true
@@ -226,7 +226,7 @@ def test_youtube_button_in_player_modal(test_env):
     response = client.get("/movies")
     assert response.status_code == 200
     assert 'id="modal-yt-btn"' in response.text
-    assert 'href="/movie/999888"' in response.text
+    assert 'href="/movie/999888?country=US"' in response.text
     assert f'data-youtube-url="{yt_url}"' in response.text
 
     # Test detail page YouTube button
@@ -298,43 +298,46 @@ def test_detail_page_prev_next_navigation(test_env):
     client = test_env["client"]
     db_path = test_env["db_path"]
 
+    set_monitored_country(db_path, "US", "movie,tv")
+    set_monitored_country(db_path, "TR", "movie,tv")
+
     item1 = upsert_media_item(db_path, title="Movie One", type="movie", release_year=2024, season_name=None, folder_name="Movie One (2024)", netflix_id=101)
     item2 = upsert_media_item(db_path, title="Movie Two", type="movie", release_year=2024, season_name=None, folder_name="Movie Two (2024)", netflix_id=102)
     item3 = upsert_media_item(db_path, title="Movie Three", type="movie", release_year=2024, season_name=None, folder_name="Movie Three (2024)", netflix_id=103)
 
     insert_ranking(db_path, "US", "Movies", 1, "2026-08-01", item1)
-    insert_ranking(db_path, "US", "Movies", 2, "2026-08-01", item2)
-    insert_ranking(db_path, "US", "Movies", 3, "2026-08-01", item3)
+    insert_ranking(db_path, "US", "Movies", 10, "2026-08-01", item2)
+    insert_ranking(db_path, "TR", "Movies", 1, "2026-08-01", item3)
 
-    # View Movie Two (Rank 2) -> Position #02 / 3. Prev is Movie One, Next is Movie Three
-    resp = client.get("/movie/102")
-    assert resp.status_code == 200
-    assert "Movie Two" in resp.text
-    assert '#02' in resp.text
-    assert 'id="detail-prev-link"' in resp.text
-    assert 'id="detail-next-link"' in resp.text
-    assert '/movie/101' in resp.text
-    assert '/movie/103' in resp.text
-    assert 'side-arrow-left' in resp.text
-    assert 'side-arrow-right' in resp.text
+    # 1. View US Rank 1 (Movie One): Prev HIDDEN, Next is Movie Two in US
+    resp_1 = client.get("/movie/101?country=US")
+    assert resp_1.status_code == 200
+    assert "Movie One" in resp_1.text
+    assert 'US' in resp_1.text
+    assert '#01' in resp_1.text
+    assert 'id="detail-prev-link"' not in resp_1.text
+    assert 'id="detail-next-link"' in resp_1.text
+    assert '/movie/102?country=US' in resp_1.text
 
-    # View Movie One (Rank 1) -> Position #01 / 3. Prev button should be HIDDEN, Next is Movie Two
-    resp_first = client.get("/movie/101")
-    assert resp_first.status_code == 200
-    assert '#01' in resp_first.text
-    assert 'id="detail-prev-link"' not in resp_first.text
-    assert 'side-arrow-left' not in resp_first.text
-    assert 'id="detail-next-link"' in resp_first.text
-    assert '/movie/102' in resp_first.text
+    # 2. View US Rank 10 (Movie Two): Prev is Movie One in US, Next transitions across region to Movie Three in TR (#01/10)
+    resp_2 = client.get("/movie/102?country=US")
+    assert resp_2.status_code == 200
+    assert "Movie Two" in resp_2.text
+    assert '#10' in resp_2.text
+    assert 'id="detail-prev-link"' in resp_2.text
+    assert '/movie/101?country=US' in resp_2.text
+    assert 'id="detail-next-link"' in resp_2.text
+    assert '/movie/103?country=TR' in resp_2.text
 
-    # View Movie Three (Rank 3 - last item) -> Position #03 / 3. Next button should be HIDDEN, Prev is Movie Two
-    resp_last = client.get("/movie/103")
-    assert resp_last.status_code == 200
-    assert '#03' in resp_last.text
-    assert 'id="detail-next-link"' not in resp_last.text
-    assert 'side-arrow-right' not in resp_last.text
-    assert 'id="detail-prev-link"' in resp_last.text
-    assert '/movie/102' in resp_last.text
+    # 3. View TR Rank 1 (Movie Three): Prev goes back across region to Movie Two in US (#10/10), Next HIDDEN (last item of sequence)
+    resp_3 = client.get("/movie/103?country=TR")
+    assert resp_3.status_code == 200
+    assert "Movie Three" in resp_3.text
+    assert 'TR' in resp_3.text
+    assert '#01' in resp_3.text
+    assert 'id="detail-prev-link"' in resp_3.text
+    assert '/movie/102?country=US' in resp_3.text
+    assert 'id="detail-next-link"' not in resp_3.text
 
 
 

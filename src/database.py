@@ -468,15 +468,48 @@ def get_media_item_by_netflix_id(db_path: str, netflix_id_or_id: int | str, item
     finally:
         conn.close()
 
-def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | None, dict | None, int | None, int]:
-    """Gets previous & next media items (without wrap-around), position index, and total item count."""
+COUNTRY_NAMES = {
+    "GLOBAL": "Global",
+    "US": "United States",
+    "GB": "United Kingdom",
+    "CA": "Canada",
+    "AU": "Australia",
+    "DE": "Germany",
+    "FR": "France",
+    "ES": "Spain",
+    "IT": "Italy",
+    "JP": "Japan",
+    "KR": "South Korea",
+    "BR": "Brazil",
+    "MX": "Mexico",
+    "IN": "India",
+    "TR": "Turkey"
+}
+
+def get_prev_next_media_items(
+    db_path: str,
+    current_item: dict,
+    target_country: str | None = None
+) -> tuple[dict | None, dict | None, int | None, str | None, str | None]:
+    """
+    Gets previous & next media items across monitored regions in landing page order.
+    Returns (prev_item, next_item, item_rank, country_code, country_name).
+    - prev_item is None ONLY if at position #1 of the first region.
+    - next_item is None ONLY if at position #10 (or last item) of the last region.
+    - Crossing region boundaries transitions seamlessly (#10/10 -> #01/10 or #01/10 -> #10/10).
+    """
     if not current_item:
-        return None, None, None, 0
+        return None, None, None, None, None
 
     conn = _get_connection(db_path)
     try:
         item_type = str(current_item.get("type", "movie")).lower()
+        category = "Movies" if item_type == "movie" else "TV"
         current_id = current_item.get("id")
+        current_netflix_id = current_item.get("netflix_id")
+
+        # Get monitored countries in order
+        monitored = get_monitored_countries(db_path)
 
         # Get latest week if rankings exist
         latest_week = ""
@@ -485,51 +518,89 @@ def get_prev_next_media_items(db_path: str, current_item: dict) -> tuple[dict | 
         if row:
             latest_week = row["week"]
 
-        if latest_week:
-            cursor = conn.execute("""
-                SELECT m.*
-                FROM media_items m
-                LEFT JOIN (
-                    SELECT media_item_id, MIN(rank) as min_rank
-                    FROM rankings
-                    WHERE week = ?
-                    GROUP BY media_item_id
-                ) r ON m.id = r.media_item_id
-                WHERE m.type = ?
-                ORDER BY 
-                    CASE WHEN r.min_rank IS NOT NULL THEN 0 ELSE 1 END,
-                    r.min_rank ASC,
-                    m.id ASC
-            """, (latest_week, item_type))
-        else:
-            cursor = conn.execute("""
-                SELECT * FROM media_items
-                WHERE type = ?
-                ORDER BY id ASC
-            """, (item_type,))
+        sequence = []
+        if monitored and latest_week:
+            for m in monitored:
+                code = m["country_code"]
+                formats = [f.strip().lower() for f in m.get("formats", "movie,tv").split(",")]
+                if item_type in formats or (item_type == "movie" and "films" in formats):
+                    rankings = get_active_rankings(db_path, code, category, latest_week)
+                    for r in rankings:
+                        sequence.append({
+                            "media_item": r,
+                            "rank": r["rank"],
+                            "country_code": code,
+                            "country_name": COUNTRY_NAMES.get(code, code)
+                        })
 
-        items = [dict(r) for r in cursor.fetchall()]
-        if not items:
-            return None, None, None, 0
+        if not sequence:
+            # Fallback to plain media_items table
+            cursor = conn.execute("SELECT * FROM media_items WHERE type = ? ORDER BY id ASC", (item_type,))
+            raw_items = [dict(r) for r in cursor.fetchall()]
+            for idx, r in enumerate(raw_items):
+                sequence.append({
+                    "media_item": r,
+                    "rank": idx + 1,
+                    "country_code": None,
+                    "country_name": None
+                })
 
-        total_items = len(items)
+        if not sequence:
+            return None, None, None, None, None
 
         current_index = -1
-        for idx, itm in enumerate(items):
-            if itm["id"] == current_id or (itm.get("netflix_id") and current_item.get("netflix_id") and itm.get("netflix_id") == current_item.get("netflix_id")):
-                current_index = idx
-                break
+
+        # Try matching both country and item_id if target_country is specified
+        if target_country:
+            tc = target_country.upper()
+            for idx, entry in enumerate(sequence):
+                mi = entry["media_item"]
+                mi_id = mi.get("media_item_id") or mi.get("id")
+                if entry["country_code"] == tc and (
+                    mi_id == current_id or
+                    (current_netflix_id and mi.get("netflix_id") == current_netflix_id)
+                ):
+                    current_index = idx
+                    break
+
+        # Fallback to first matching item in sequence
+        if current_index == -1:
+            for idx, entry in enumerate(sequence):
+                mi = entry["media_item"]
+                mi_id = mi.get("media_item_id") or mi.get("id")
+                if mi_id == current_id or (current_netflix_id and mi.get("netflix_id") == current_netflix_id):
+                    current_index = idx
+                    break
 
         if current_index == -1:
-            return None, None, None, total_items
+            return None, None, None, None, None
 
-        position = current_index + 1
+        current_entry = sequence[current_index]
+        rank = current_entry["rank"]
+        country_code = current_entry["country_code"]
+        country_name = current_entry["country_name"]
 
-        # No wrap-around: hide prev at position 1, hide next at position total_items
-        prev_item = items[current_index - 1] if current_index > 0 else None
-        next_item = items[current_index + 1] if current_index < total_items - 1 else None
+        # Build prev_item dict
+        prev_item = None
+        if current_index > 0:
+            p_entry = sequence[current_index - 1]
+            p_mi = dict(p_entry["media_item"])
+            p_mi["country_code"] = p_entry["country_code"]
+            p_mi["country_name"] = p_entry["country_name"]
+            p_mi["rank"] = p_entry["rank"]
+            prev_item = p_mi
 
-        return prev_item, next_item, position, total_items
+        # Build next_item dict
+        next_item = None
+        if current_index < len(sequence) - 1:
+            n_entry = sequence[current_index + 1]
+            n_mi = dict(n_entry["media_item"])
+            n_mi["country_code"] = n_entry["country_code"]
+            n_mi["country_name"] = n_entry["country_name"]
+            n_mi["rank"] = n_entry["rank"]
+            next_item = n_mi
+
+        return prev_item, next_item, rank, country_code, country_name
     finally:
         conn.close()
 
